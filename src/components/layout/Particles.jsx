@@ -11,7 +11,7 @@ export default function Particles({ density = 0.00007, className = '', maxSpeed 
     let h = 0
     let dpr = Math.min(window.devicePixelRatio || 1, 2)
     const particles = []
-    const colors = ['37,99,235', '79,70,229', '6,182,212', '16,185,129']
+    const colors = ['6,182,212', '139,92,246', '16,185,129', '59,130,246']
 
     const resize = () => {
       w = canvas.clientWidth
@@ -33,7 +33,7 @@ export default function Particles({ density = 0.00007, className = '', maxSpeed 
           vy: (Math.random() - 0.5) * maxSpeed,
           r: Math.random() * 1.6 + 0.4,
           c: colors[Math.floor(Math.random() * colors.length)],
-          a: Math.random() * 0.35 + 0.1,
+          a: Math.random() * 0.3 + 0.08,
         })
       }
     }
@@ -50,7 +50,7 @@ export default function Particles({ density = 0.00007, className = '', maxSpeed 
         ctx.fillStyle = `rgba(${p.c},${p.a})`
         ctx.fill()
       }
-      const linkDist = 130
+      const linkDist = 140
       for (let i = 0; i < particles.length; i++) {
         for (let j = i + 1; j < particles.length; j++) {
           const a = particles[i]
@@ -59,8 +59,8 @@ export default function Particles({ density = 0.00007, className = '', maxSpeed 
           const dy = a.y - b.y
           const dist = Math.hypot(dx, dy)
           if (dist < linkDist) {
-            const alpha = (1 - dist / linkDist) * 0.08
-            ctx.strokeStyle = `rgba(37,99,235,${alpha})`
+            const alpha = (1 - dist / linkDist) * 0.06
+            ctx.strokeStyle = `rgba(6,182,212,${alpha})`
             ctx.lineWidth = 0.6
             ctx.beginPath()
             ctx.moveTo(a.x, a.y)

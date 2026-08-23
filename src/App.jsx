@@ -18,20 +18,16 @@ const ExperienceScroll = lazy(() => import('./components/sections/ExperienceScro
 const Journey = lazy(() => import('./components/sections/Journey'))
 const AIAssistant = lazy(() => import('./components/sections/AIAssistant'))
 const Features = lazy(() => import('./components/sections/Features'))
-const LiveActivity = lazy(() => import('./components/sections/LiveActivity'))
 const SuccessStories = lazy(() => import('./components/sections/SuccessStories'))
 const Stats = lazy(() => import('./components/sections/Stats'))
-const Highlights = lazy(() => import('./components/sections/Highlights'))
+const About = lazy(() => import('./components/sections/About'))
 const FAQ = lazy(() => import('./components/sections/FAQ'))
 const FinalCTA = lazy(() => import('./components/sections/FinalCTA'))
 
 function Loader() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-label="Loading">
-      <div className="relative h-14 w-14">
-        <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-electric border-r-neon" />
-        <span className="absolute inset-2 animate-spin rounded-full border-2 border-transparent border-b-mint border-l-electric [animation-direction:reverse]" />
-      </div>
+      <div className="loader" />
     </div>
   )
 }
@@ -58,10 +54,9 @@ function Home() {
         <Journey />
         <AIAssistant />
         <Features />
-        <LiveActivity />
         <SuccessStories />
         <Stats />
-        <Highlights />
+        <About />
         <FAQ />
         <FinalCTA />
       </Suspense>

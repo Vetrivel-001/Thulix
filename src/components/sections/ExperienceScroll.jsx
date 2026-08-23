@@ -1,8 +1,9 @@
 import { useLayoutEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { ArrowRight, Flame, Zap, Award, Users, Wallet, Star, MousePointerClick, Filter, CalendarClock, Handshake } from 'lucide-react'
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts'
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, CartesianGrid } from 'recharts'
 import { STUDENT_FEATURES, TRAINER_FEATURES, RECRUITER_FEATURES } from '../../lib/data'
 import { Icon } from '../../lib/icons'
 
@@ -19,16 +20,31 @@ const revenue = [
 ]
 
 const pipeline = [
-  { stage: 'Applied', value: 340, color: '#2563EB' },
-  { stage: 'Screened', value: 182, color: '#4F46E5' },
-  { stage: 'Interviewed', value: 74, color: '#06B6D4' },
-  { stage: 'Offered', value: 28, color: '#10B981' },
+  { stage: 'Applied', value: 340, color: '#059669', pct: 100 },
+  { stage: 'Screened', value: 182, color: '#10B981', pct: 53 },
+  { stage: 'Interview', value: 74, color: '#06B6D4', pct: 22 },
+  { stage: 'Offered', value: 28, color: '#34D399', pct: 8 },
+]
+
+const hiringTrend = [
+  { m: 'Jan', hired: 4, pipeline: 18 }, { m: 'Feb', hired: 6, pipeline: 24 },
+  { m: 'Mar', hired: 5, pipeline: 20 }, { m: 'Apr', hired: 9, pipeline: 32 },
+  { m: 'May', hired: 8, pipeline: 28 }, { m: 'Jun', hired: 12, pipeline: 38 },
+  { m: 'Jul', hired: 11, pipeline: 35 }, { m: 'Aug', hired: 15, pipeline: 45 },
 ]
 
 const candidates = [
-  { name: 'Ananya S.', skill: 'React - 94% match', c: '#2563EB' },
-  { name: 'Rohan M.', skill: 'Data - 91% match', c: '#4F46E5' },
-  { name: 'Priya K.', skill: 'AI/ML - 89% match', c: '#06B6D4' },
+  { name: 'Ananya S.', skill: 'React', match: 94, status: 'Interview', c: '#059669' },
+  { name: 'Rohan M.', skill: 'Data Science', match: 91, status: 'Review', c: '#10B981' },
+  { name: 'Priya K.', skill: 'AI/ML', match: 89, status: 'Shortlisted', c: '#06B6D4' },
+  { name: 'Arun T.', skill: 'Full Stack', match: 86, status: 'New', c: '#34D399' },
+]
+
+const skillLevels = [
+  { skill: 'React', level: 94, color: '#10B981' },
+  { skill: 'JavaScript', level: 88, color: '#059669' },
+  { skill: 'CSS/Tailwind', level: 82, color: '#06B6D4' },
+  { skill: 'Node.js', level: 71, color: '#34D399' },
 ]
 
 function PanelShell({ id, title, gradient, kicker, text, children }) {
@@ -36,7 +52,7 @@ function PanelShell({ id, title, gradient, kicker, text, children }) {
     <section className="flex h-screen w-screen shrink-0 items-center px-5 lg:px-8" id={id} aria-label={title}>
       <div className="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-2 lg:gap-16">
         <div data-animate className="max-w-xl">
-          <span className="glass inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em]">
+          <span className="inline-flex items-center gap-2 rounded-full border border-border glass px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-snow">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: gradient[0] }} aria-hidden="true" />
             {kicker}
           </span>
@@ -57,11 +73,9 @@ function PanelShell({ id, title, gradient, kicker, text, children }) {
 
 function RoleDashboard({ gradient }) {
   return (
-    <div
-      className="glass-card relative mx-auto w-full max-w-[480px] p-5 sm:p-6"
-      style={{ background: `linear-gradient(165deg, ${gradient[1]}08, rgba(255,255,255,0.95) 45%, ${gradient[0]}06)` }}
-    >
-      <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full blur-3xl opacity-15" style={{ background: gradient[0] }} aria-hidden="true" />
+    <div className="relative mx-auto w-full max-w-[480px] overflow-hidden rounded-2xl border border-border glass p-5 shadow-xl shadow-black/20 sm:p-6">
+      <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full blur-3xl opacity-[0.06]" style={{ background: gradient[0] }} aria-hidden="true" />
+      <div className="pointer-events-none absolute -bottom-16 -left-16 h-32 w-32 rounded-full blur-2xl opacity-[0.04]" style={{ background: gradient[1] }} aria-hidden="true" />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <span className="grid h-9 w-9 place-items-center rounded-lg text-white" style={{ background: `linear-gradient(120deg, ${gradient[0]}, ${gradient[1]})` }}>
@@ -82,41 +96,72 @@ function RoleDashboard({ gradient }) {
 }
 
 const STUDENT_DASHBOARD = {
-  gradient: ['#2563EB', '#4F46E5', 'dashboard', 'Student Workspace', 'ananya.s - Frontend track', (
+  gradient: ['#059669', '#10B981', 'dashboard', 'Student Workspace', 'ananya.s — Frontend track', (
     <>
       <div className="h-32 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={weekly} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="sFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2563EB" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#4F46E5" stopOpacity={0} />
+                <stop offset="0%" stopColor="#059669" stopOpacity={0.2} />
+                <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
               </linearGradient>
             </defs>
+            <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />
             <XAxis dataKey="w" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
             <YAxis hide domain={[0, 100]} />
-            <Area type="monotone" dataKey="v" stroke="#4F46E5" strokeWidth={2} fill="url(#sFill)" />
+            <Tooltip
+              cursor={{ stroke: 'rgba(5,150,105,0.2)' }}
+              contentStyle={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 12, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}
+              labelStyle={{ color: '#64748b' }}
+            />
+            <Area type="monotone" dataKey="v" stroke="#10B981" strokeWidth={2} fill="url(#sFill)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>
       <div className="mt-4 grid grid-cols-3 gap-3">
         {[
           { icon: Flame, label: 'Streak', value: '42d', color: '#F59E0B' },
-          { icon: Zap, label: 'XP', value: '12.4k', color: '#2563EB' },
+          { icon: Zap, label: 'XP', value: '12.4k', color: '#059669' },
           { icon: Award, label: 'Badges', value: '8', color: '#10B981' },
         ].map(({ icon: I, label, value, color }) => (
-          <div key={label} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-center">
+          <div key={label} className="rounded-2xl border border-border bg-abyss-2 p-3 text-center">
             <I size={16} className="mx-auto" style={{ color }} aria-hidden="true" />
             <p className="mt-1 font-heading text-base font-bold text-snow">{value}</p>
             <p className="text-[10px] text-mist">{label}</p>
           </div>
         ))}
       </div>
+      <div className="mt-4">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-mist">Skill Progress</p>
+        <div className="space-y-2">
+          {skillLevels.map(({ skill, level, color }) => (
+            <div key={skill} className="flex items-center gap-2.5">
+              <span className="w-16 text-[10px] text-mist">{skill}</span>
+              <div className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-abyss-3">
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-full"
+                  style={{ background: color }}
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${level}%` }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1], delay: 0.4 }}
+                />
+              </div>
+              <span className="w-7 text-right text-[10px] font-semibold" style={{ color }}>{level}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="mt-4 space-y-2">
-        {['Advanced React - on track', 'Portfolio project - reviewed A+', 'Mock interview - scheduled Fri'].map((t, i) => (
-          <div key={t} className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
-            <span className={`h-2 w-2 rounded-full ${i === 0 ? 'bg-mint' : i === 1 ? 'bg-electric' : 'bg-golden'}`} aria-hidden="true" />
-            <p className="text-xs text-snow">{t}</p>
+        {[
+          { text: 'Advanced React — on track', dot: 'bg-mint' },
+          { text: 'Portfolio project — reviewed A+', dot: 'bg-electric' },
+          { text: 'Mock interview — scheduled Fri', dot: 'bg-golden' },
+        ].map(({ text, dot }) => (
+          <div key={text} className="flex items-center gap-2.5 rounded-xl border border-border bg-abyss-2 px-3 py-2.5">
+            <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
+            <p className="text-xs text-snow">{text}</p>
           </div>
         ))}
       </div>
@@ -125,7 +170,7 @@ const STUDENT_DASHBOARD = {
 }
 
 const TRAINER_DASHBOARD = {
-  gradient: ['#4F46E5', '#06B6D4', 'presentation', 'Trainer Studio', 'arun.t - React Academy', (
+  gradient: ['#10B981', '#06B6D4', 'presentation', 'Trainer Studio', 'arun.t — React Academy', (
     <>
       <div className="h-32 w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -134,7 +179,7 @@ const TRAINER_DASHBOARD = {
             <YAxis hide />
             <Bar dataKey="v" radius={[6, 6, 0, 0]}>
               {revenue.map((_, i) => (
-                <Cell key={i} fill={i % 2 ? '#4F46E5' : '#06B6D4'} />
+                <Cell key={i} fill={i % 2 ? '#10B981' : '#06B6D4'} />
               ))}
             </Bar>
           </BarChart>
@@ -142,11 +187,11 @@ const TRAINER_DASHBOARD = {
       </div>
       <div className="mt-4 grid grid-cols-3 gap-3">
         {[
-          { icon: Users, label: 'Students', value: '2.4k', color: '#2563EB' },
+          { icon: Users, label: 'Students', value: '2.4k', color: '#059669' },
           { icon: Wallet, label: 'Revenue', value: '$18k', color: '#10B981' },
           { icon: Star, label: 'Rating', value: '4.9', color: '#F59E0B' },
         ].map(({ icon: I, label, value, color }) => (
-          <div key={label} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-center">
+          <div key={label} className="rounded-2xl border border-border bg-abyss-2 p-3 text-center">
             <I size={16} className="mx-auto" style={{ color }} aria-hidden="true" />
             <p className="mt-1 font-heading text-base font-bold text-snow">{value}</p>
             <p className="text-[10px] text-mist">{label}</p>
@@ -154,9 +199,9 @@ const TRAINER_DASHBOARD = {
         ))}
       </div>
       <div className="mt-4 space-y-2">
-        {['React Advanced - 92% completion', 'Live class - 340 attending tonight', 'New quiz - auto-published by AI'].map((t) => (
-          <div key={t} className="flex items-center gap-2.5 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
-            <span className="h-2 w-2 rounded-full bg-neon" aria-hidden="true" />
+        {['React Advanced — 92% completion', 'Live class — 340 attending tonight', 'New quiz — auto-published by AI'].map((t) => (
+          <div key={t} className="flex items-center gap-2.5 rounded-xl border border-border bg-abyss-2 px-3 py-2.5">
+            <span className="h-2 w-2 rounded-full bg-electric" aria-hidden="true" />
             <p className="text-xs text-snow">{t}</p>
           </div>
         ))}
@@ -168,43 +213,92 @@ const TRAINER_DASHBOARD = {
 const RECRUITER_DASHBOARD = {
   gradient: ['#06B6D4', '#10B981', 'recruiter', 'Recruiter Console', 'talent@northwind.co', (
     <>
-      <div className="h-36 w-full">
+      <div className="mb-4">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-mist">Hiring Pipeline</p>
+        <div className="space-y-2">
+          {pipeline.map((d, i) => (
+            <div key={d.stage} className="flex items-center gap-2.5">
+              <span className="w-16 text-[10px] text-mist">{d.stage}</span>
+              <div className="relative h-5 flex-1 overflow-hidden rounded-md bg-abyss-3">
+                <motion.div
+                  className="absolute inset-y-0 left-0 rounded-md flex items-center justify-end pr-2"
+                  style={{ background: `linear-gradient(90deg, ${d.color}30, ${d.color})` }}
+                  initial={{ width: 0 }}
+                  whileInView={{ width: `${d.pct}%` }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.2 + i * 0.12 }}
+                >
+                  <span className="text-[9px] font-bold text-white">{d.value}</span>
+                </motion.div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-28 w-full">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-mist">Hiring Trend</p>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart layout="vertical" data={pipeline} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
-            <XAxis type="number" hide />
-            <YAxis type="category" dataKey="stage" width={72} tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
-            <Bar dataKey="value" radius={[0, 6, 6, 0]} barSize={16}>
-              {pipeline.map((d, i) => (
-                <Cell key={i} fill={d.color} />
-              ))}
-            </Bar>
-          </BarChart>
+          <AreaChart data={hiringTrend} margin={{ top: 4, right: 0, left: -20, bottom: 0 }}>
+            <defs>
+              <linearGradient id="hHired" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#10B981" stopOpacity={0.15} />
+                <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="hPipeline" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#06B6D4" stopOpacity={0.1} />
+                <stop offset="100%" stopColor="#06B6D4" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke="rgba(0,0,0,0.04)" vertical={false} />
+            <XAxis dataKey="m" tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} />
+            <YAxis hide />
+            <Tooltip
+              cursor={{ stroke: 'rgba(6,182,212,0.2)' }}
+              contentStyle={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 10, fontSize: 11, boxShadow: '0 4px 12px rgba(0,0,0,0.06)' }}
+              labelStyle={{ color: '#64748b' }}
+            />
+            <Area type="monotone" dataKey="pipeline" stroke="#06B6D4" strokeWidth={1.5} fill="url(#hPipeline)" />
+            <Area type="monotone" dataKey="hired" stroke="#10B981" strokeWidth={2} fill="url(#hHired)" />
+          </AreaChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-3">
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
         {[
-          { icon: Filter, label: 'Open roles', value: '12', color: '#2563EB' },
-          { icon: CalendarClock, label: 'Interviews', value: '28', color: '#4F46E5' },
-          { icon: Handshake, label: 'Hired', value: '9', color: '#10B981' },
+          { icon: Filter, label: 'Open roles', value: '12', color: '#059669' },
+          { icon: CalendarClock, label: 'Interviews', value: '28', color: '#10B981' },
+          { icon: Handshake, label: 'Hired', value: '9', color: '#06B6D4' },
         ].map(({ icon: I, label, value, color }) => (
-          <div key={label} className="rounded-2xl border border-gray-200 bg-gray-50 p-3 text-center">
-            <I size={16} className="mx-auto" style={{ color }} aria-hidden="true" />
-            <p className="mt-1 font-heading text-base font-bold text-snow">{value}</p>
-            <p className="text-[10px] text-mist">{label}</p>
+          <div key={label} className="rounded-xl border border-border bg-abyss-2 p-2.5 text-center">
+            <I size={14} className="mx-auto" style={{ color }} aria-hidden="true" />
+            <p className="mt-1 font-heading text-sm font-bold text-snow">{value}</p>
+            <p className="text-[9px] text-mist">{label}</p>
           </div>
         ))}
       </div>
-      <div className="mt-4 space-y-2">
+
+      <div className="mt-3 space-y-1.5">
         {candidates.map((c) => (
-          <div key={c.name} className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: c.c }}>
+          <div key={c.name} className="flex items-center gap-2.5 rounded-xl border border-border bg-abyss-2 px-3 py-2">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[9px] font-bold text-white" style={{ background: c.c }}>
               {c.name.split(' ').map((w) => w[0]).join('')}
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-xs font-semibold text-snow">{c.name}</p>
-              <p className="text-[10px] text-mist">{c.skill}</p>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <p className="truncate text-[11px] font-semibold text-snow">{c.name}</p>
+                <span className="text-[9px] font-bold text-mint">{c.match}%</span>
+              </div>
+              <div className="mt-0.5 flex items-center gap-2">
+                <span className="text-[9px] text-mist">{c.skill}</span>
+                <span className={`ml-auto rounded-full px-1.5 py-0.5 text-[8px] font-semibold ${
+                  c.status === 'Interview' ? 'bg-mint/15 text-mint' :
+                  c.status === 'Shortlisted' ? 'bg-electric/15 text-electric' :
+                  c.status === 'Review' ? 'bg-golden/15 text-golden' :
+                  'bg-abyss-3 text-mist'
+                }`}>{c.status}</span>
+              </div>
             </div>
-            <span className="ml-auto text-[10px] font-bold text-mint">Match</span>
           </div>
         ))}
       </div>
@@ -220,7 +314,7 @@ const ROLES = [
 
 function Chip({ label, color }) {
   return (
-    <span className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-snow transition-colors duration-300 hover:border-gray-300">
+    <span className="rounded-full border border-border bg-abyss-3/[0.8] px-3 py-1.5 text-xs font-medium text-snow transition-colors duration-300 hover:border-electric/20 hover:bg-abyss-3">
       <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ background: color }} aria-hidden="true" />
       {label}
     </span>
@@ -249,7 +343,7 @@ export default function ExperienceScroll() {
             trigger: sectionRef.current,
             start: 'top top',
             end: () => `+=${getDist()}`,
-            scrub: 1,
+            scrub: 1.2,
             pin: true,
             anticipatePin: 1,
             invalidateOnRefresh: true,
@@ -260,17 +354,18 @@ export default function ExperienceScroll() {
         panels.forEach((panel) => {
           gsap.fromTo(
             panel.querySelectorAll('[data-animate]'),
-            { opacity: 0, y: 70 },
+            { opacity: 0, y: 70, scale: 0.97 },
             {
               opacity: 1,
               y: 0,
-              duration: 0.9,
+              scale: 1,
+              duration: 1,
               ease: 'power3.out',
-              stagger: 0.12,
+              stagger: 0.15,
               scrollTrigger: {
                 trigger: panel,
                 containerAnimation: tween,
-                start: 'left 65%',
+                start: 'left 70%',
                 toggleActions: 'play none none reverse',
               },
             }
@@ -292,12 +387,12 @@ export default function ExperienceScroll() {
   }, [])
 
   return (
-    <section id="careers" ref={sectionRef} className="relative overflow-hidden bg-gray-50" aria-label="Experience by role">
+    <section id="careers" ref={sectionRef} className="relative overflow-hidden bg-abyss-2" aria-label="Experience by role">
       <div ref={trackRef} className="flex w-max">
         <section data-panel className="flex h-screen w-screen shrink-0 items-center px-5 lg:px-8" aria-label="Introduction">
           <div className="mx-auto w-full max-w-7xl">
             <div data-animate className="max-w-3xl">
-              <span className="glass inline-flex items-center gap-2 rounded-full border border-gray-200 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border glass px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-snow">
                 <MousePointerClick size={13} className="text-electric" aria-hidden="true" />
                 <span className="text-gradient">Keep Scrolling</span>
               </span>
@@ -307,10 +402,10 @@ export default function ExperienceScroll() {
                 <span className="text-gradient-animate">Three Perspectives.</span>
               </h2>
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-mist">
-                Drag through the experience of every user on SkillBridge AI - and see how the same intelligence powers them all.
+                Drag through the experience of every user on Thulix - and see how the same intelligence powers them all.
               </p>
               <div className="mt-8 flex items-center gap-3 text-sm text-mist">
-                <span className="glass rounded-full border border-gray-200 px-4 py-2">Swipe - explore</span>
+                <span className="rounded-full border border-border bg-abyss-3/[0.8] px-4 py-2 shadow-sm">Swipe - explore</span>
               </div>
             </div>
           </div>
@@ -333,13 +428,13 @@ export default function ExperienceScroll() {
 
         <section data-panel className="flex h-screen w-screen shrink-0 items-center px-5 lg:px-8" aria-label="Explore more">
           <div className="mx-auto w-full max-w-7xl">
-            <div data-animate className="glass-card max-w-2xl p-10 lg:p-14">
+            <div data-animate className="max-w-2xl rounded-2xl border border-border glass p-10 shadow-xl shadow-black/20 lg:p-14">
               <h3 className="font-heading text-4xl font-bold leading-tight text-snow sm:text-5xl">
                 Ready to see it from <span className="text-gradient-animate">your seat?</span>
               </h3>
               <p className="mt-4 text-mist">Every role gets its own intelligent workspace - powered by the same AI engine.</p>
               <div className="mt-8 flex flex-wrap gap-4">
-                <a href="#" onClick={(e) => e.preventDefault()} className="group inline-flex items-center gap-2 rounded-full bg-[linear-gradient(120deg,#2563EB,#4F46E5)] px-7 py-3.5 text-sm font-semibold text-white">
+                <a href="#" onClick={(e) => e.preventDefault()} className="group inline-flex items-center gap-2 rounded-full bg-[linear-gradient(120deg,#059669,#10B981)] px-7 py-3.5 text-sm font-semibold text-white">
                   Create your workspace <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
                 </a>
               </div>

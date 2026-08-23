@@ -1,61 +1,104 @@
 import { motion } from 'framer-motion'
-import { ArrowRight, Rocket } from 'lucide-react'
+import { ArrowRight, Mail, User, Briefcase } from 'lucide-react'
 import MagneticButton from '../ui/MagneticButton'
-import Particles from '../layout/Particles'
-import { fadeUp, stagger, viewportOnce } from '../../lib/animations'
+
+const ctaWords = ['The', 'Future', 'of', 'Learning', '&', 'Hiring', 'Starts', 'Here']
+
+function PricingCard({ t, i }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 50, scale: 0.85, rotateX: 15 }}
+      whileInView={{ opacity: 1, y: 0, scale: 1, rotateX: 0 }}
+      transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1], delay: 0.6 + i * 0.12 }}
+      viewport={{ once: true }}
+      className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-abyss-3/[0.65] p-4 backdrop-blur-sm transition-all duration-500 hover:border-white/[0.12] hover:-translate-y-2 hover:shadow-lg hover:shadow-black/20 sm:p-6"
+    >
+      <div aria-hidden="true" className="absolute -bottom-8 -right-8 h-24 w-24 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-25" style={{ background: t.color }} />
+      <div aria-hidden="true" className="absolute inset-x-0 top-0 h-px opacity-0 transition-opacity duration-500 group-hover:opacity-100" style={{ background: `linear-gradient(90deg, transparent, ${t.color}40, transparent)` }} />
+      <div aria-hidden="true" className="card-shimmer" />
+      <div className="relative" style={{ transform: 'translateZ(2px)' }}>
+        <t.icon size={22} className={`mx-auto transition-all duration-500 group-hover:scale-125 ${t.color}`} aria-hidden="true" />
+        <p className="mt-2.5 text-xs font-semibold text-snow">{t.label}</p>
+        <p className="mt-1 text-[11px] text-mist">{t.value}</p>
+      </div>
+    </motion.div>
+  )
+}
 
 export default function FinalCTA() {
   return (
-    <section id="contact" className="relative overflow-hidden py-20 lg:py-28">
-      <div aria-hidden="true" className="absolute inset-0 grid-bg" />
-      <div aria-hidden="true" className="absolute inset-0">
-        <div className="orb left-[10%] top-[-20%] h-[520px] w-[520px] animate-aurora-a bg-electric/8" />
-        <div className="orb right-[5%] top-[10%] h-[440px] w-[440px] animate-aurora-b bg-neon/6" />
-        <div className="orb bottom-[-25%] left-[40%] h-[500px] w-[500px] animate-aurora-c bg-mint/5" />
-      </div>
-      <div className="absolute inset-0">
-        <Particles density={0.00005} />
-      </div>
+    <section id="cta" className="relative overflow-hidden bg-abyss py-16 lg:py-24">
+      <div aria-hidden="true" className="orb left-[30%] top-[10%] h-[500px] w-[500px] bg-electric/6" />
+      <div aria-hidden="true" className="orb right-[20%] bottom-[10%] h-[400px] w-[400px] bg-neon/6" />
 
-      <motion.div
-        variants={stagger(0.14)}
-        initial="hidden"
-        whileInView="visible"
-        viewport={viewportOnce}
-        className="relative z-10 mx-auto max-w-4xl px-5 text-center lg:px-8"
-      >
-        <motion.div variants={fadeUp(0)}>
-          <span className="glass inline-flex items-center gap-2 rounded-full border border-gray-200 px-5 py-2 text-xs font-semibold uppercase tracking-[0.22em]">
-            <Rocket size={14} className="text-electric" aria-hidden="true" />
-            <span className="text-gradient">Start today - free forever tier</span>
-          </span>
+      <div className="relative mx-auto max-w-4xl px-5 text-center lg:px-8">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true }}
+          variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+        >
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.7 } } }}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-abyss-3/[0.8] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-mist"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-electric" />
+            </span>
+            Limited Early Access
+          </motion.div>
+
+          <h2 className="mt-8 font-heading text-4xl font-bold leading-tight text-snow sm:text-5xl xl:text-6xl" style={{ perspective: 800 }}>
+            {ctaWords.map((word, i) => {
+              const isGradient = word === 'Future' || word === 'Learning' || word === 'Hiring' || word === 'Here'
+              return (
+                <span key={i} className="inline-block overflow-hidden pb-1 align-bottom">
+                  <motion.span
+                    className={`inline-block ${isGradient ? 'text-gradient-animate' : ''}`}
+                    variants={{
+                      hidden: { y: '110%', rotateX: -30, opacity: 0 },
+                      visible: { y: 0, rotateX: 0, opacity: 1 },
+                    }}
+                    transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                    style={{ transformStyle: 'preserve-3d' }}
+                  >
+                    {word}{i < ctaWords.length - 1 ? '\u00A0' : ''}
+                  </motion.span>
+                </span>
+              )
+            })}
+          </h2>
+
+          <motion.p
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.7 } } }}
+            className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-mist sm:text-lg"
+          >
+            Join the first generation of learners, educators and companies building the bridge between skills and opportunities - with AI at the core.
+          </motion.p>
+
+          <motion.div
+            variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.7 } } }}
+            className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row"
+          >
+            <MagneticButton variant="primary">
+              Create your Account <ArrowRight size={16} className="transition-transform group-hover:translate-x-1" aria-hidden="true" />
+            </MagneticButton>
+            <MagneticButton variant="ghost">
+              View Live Demo
+            </MagneticButton>
+          </motion.div>
+
+          <div className="mt-8 grid grid-cols-3 gap-4 text-center sm:gap-8">
+            {[
+              { icon: User, label: 'Students', color: 'text-electric', value: 'Free forever' },
+              { icon: Briefcase, label: 'Recruiters', color: 'text-accent-blue', value: 'First 3 months free' },
+              { icon: Mail, label: 'Enterprises', color: 'text-neon', value: 'Custom pricing' },
+            ].map((t, i) => (
+              <PricingCard key={t.label} t={t} i={i} />
+            ))}
+          </div>
         </motion.div>
-
-        <motion.h2 variants={fadeUp(0.05)} className="mt-7 font-heading text-5xl font-bold leading-[1.05] text-snow sm:text-6xl lg:text-7xl">
-          Ready to Build
-          <br />
-          <span className="text-gradient-animate">Your Future?</span>
-        </motion.h2>
-
-        <motion.p variants={fadeUp(0.1)} className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-mist">
-          Start your journey today with SkillBridge AI. Learn real skills, prove them with projects, and let AI walk you into your next opportunity.
-        </motion.p>
-
-        <motion.div variants={fadeUp(0.15)} className="mt-10 flex flex-wrap items-center justify-center gap-4">
-          <MagneticButton variant="primary">
-            Start Free <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" />
-          </MagneticButton>
-          <MagneticButton variant="ghost">Explore Platform</MagneticButton>
-        </motion.div>
-
-        <motion.p variants={fadeUp(0.2)} className="mt-8 text-xs text-mist">
-          No credit card required &middot; Cancel anytime &middot; Loved by 100,000+ learners
-        </motion.p>
-      </motion.div>
-
-      <svg className="divider-curve absolute bottom-0 left-0 text-white" viewBox="0 0 1440 90" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M0,60 C360,120 1080,0 1440,60 L1440,90 L0,90 Z" fill="currentColor" />
-      </svg>
+      </div>
     </section>
   )
 }

@@ -3,14 +3,14 @@ import { motion, useMotionValue, useSpring } from 'framer-motion'
 import { Link } from 'react-router-dom'
 
 const base =
-  'group relative inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold tracking-wide transition-colors duration-300 will-change-transform select-none'
+  'group relative inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-semibold tracking-wide transition-all duration-300 will-change-transform select-none'
 
 const variants = {
   primary:
-    'text-white shadow-glow-electric bg-[linear-gradient(120deg,#2563EB,#4F46E5_55%,#06B6D4)] hover:shadow-[0_0_50px_-6px_rgba(37,99,235,0.5)]',
+    'text-white shadow-lg shadow-electric/20 bg-[linear-gradient(120deg,#06B6D4,#8B5CF6)] hover:shadow-xl hover:shadow-electric/30 hover:-translate-y-0.5',
   ghost:
-    'glass text-snow border-gray-200 hover:border-electric/40 hover:shadow-glow-electric',
-  soft: 'text-snow bg-gray-100 border border-gray-200 hover:bg-gray-200',
+    'glass text-snow border border-border hover:border-electric/30 hover:shadow-glow-electric hover:-translate-y-0.5',
+  soft: 'text-snow bg-white/[0.04] border border-border hover:bg-abyss-3/[0.8] hover:-translate-y-0.5',
 }
 
 export default function MagneticButton({

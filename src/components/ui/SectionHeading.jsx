@@ -22,15 +22,15 @@ export default function SectionHeading({
       {eyebrow && (
         <motion.span
           variants={fadeUp(0)}
-          className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em]"
+          className="inline-flex items-center gap-2 rounded-full border border-border glass px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em]"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-electric shadow-glow-electric" aria-hidden="true" />
+          <span className="h-1.5 w-1.5 rounded-full bg-electric animate-pulse-glow" aria-hidden="true" />
           <span className="text-gradient">{eyebrow}</span>
         </motion.span>
       )}
       <motion.h2
         variants={fadeUp(0.05)}
-        className={`font-heading text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl lg:text-6xl ${light ? 'text-snow' : ''}`}
+        className={`font-heading text-4xl font-bold leading-[1.08] tracking-tight text-snow sm:text-5xl lg:text-6xl ${light ? 'text-snow' : ''}`}
       >
         {title}{' '}
         {highlight && (
