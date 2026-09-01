@@ -31,13 +31,18 @@ export default function CursorGlow() {
       />
       <motion.div
         aria-hidden="true"
-        className="pointer-events-none fixed z-[6] hidden h-2.5 w-2.5 rounded-full bg-electric/50 lg:block"
+        className="pointer-events-none fixed z-[6] hidden h-3 w-3 rounded-full lg:block"
         style={{
           left: x,
           top: y,
-          translateX: '-50%',
-          translateY: '-50%',
-          boxShadow: '0 0 20px 6px rgba(6,182,212,0.2), 0 0 40px 12px rgba(139,92,246,0.08)',
+          translateX: "-50%",
+          translateY: "-50%",
+          background: "#08c6e7",
+          boxShadow: `
+            0 0 10px 3px rgba(8, 198, 231, 0.9),
+            0 0 25px 8px rgba(8, 198, 231, 0.6),
+            0 0 50px 15px rgba(139, 92, 246, 0.35)
+          `,
         }}
       />
     </>
