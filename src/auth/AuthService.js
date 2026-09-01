@@ -283,24 +283,54 @@ export function getPendingApplications() {
   )
 }
 
+// Rejected trainer/recruiter applications (for the dedicated Rejected section).
+export function getRejectedApplications() {
+  return getAllUsers().filter(
+    (u) => (u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected',
+  )
+}
+
+// Permanently remove a user/application from the store.
+export async function deleteUser(id) {
+  await delay(300)
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id)
+  if (idx === -1) throw new Error('User not found.')
+  users.splice(idx, 1)
+  writeStore(users)
+  return { ok: true }
+}
+
 export function getStats() {
   const users = getAllUsers()
   const byRole = { learner: 0, trainer: 0, recruiter: 0, admin: 0 }
   let active = 0
   let pending = 0
   let rejected = 0
+  let rejectedApps = 0
   for (const u of users) {
+    const isRejectedApp = (u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected'
+    // Rejected applications are NOT counted toward users or role totals.
+    if (isRejectedApp) {
+      rejected += 1
+      rejectedApps += 1
+      continue
+    }
     if (byRole[u.role] != null) byRole[u.role] += 1
     if (u.status === 'active') active += 1
     else if (u.status === 'pending') pending += 1
     else if (u.status === 'rejected') rejected += 1
   }
-  const sorted = [...users].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  const nonRejected = users.filter(
+    (u) => !((u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected'),
+  )
+  const sorted = [...nonRejected].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   return {
-    total: users.length,
+    total: nonRejected.length,
     active,
     pending,
     rejected,
+    rejectedApps,
     byRole,
     recent: sorted.slice(0, 5),
   }

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Activity, AlertTriangle, ArrowRight, Bell, Check, Clock, LayoutDashboard,
-  Mail, RefreshCw, Search, ShieldCheck, UserCheck, UserX, Users, X,
+  Mail, RefreshCw, Search, ShieldCheck, Trash2, Undo2, UserCheck, UserX, Users, X,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 import { ROLE_LABELS } from '../auth/permission'
@@ -39,12 +39,15 @@ function StatusBadge({ status }) {
 }
 
 export default function AdminDashboard() {
-  const { user, getAllUsers, getPendingApplications, getStats, setUserStatus } = useAuth()
+  const { user, getAllUsers, getPendingApplications, getRejectedApplications, getStats, setUserStatus, deleteUser } = useAuth()
   const [users, setUsers] = useState([])
   const [apps, setApps] = useState([])
+  const [rejectedApps, setRejectedApps] = useState([])
   const [stats, setStats] = useState(null)
   const [busy, setBusy] = useState({})
   const [notice, setNotice] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [confirmingRemove, setConfirmingRemove] = useState(null)
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -52,12 +55,27 @@ export default function AdminDashboard() {
   const reload = useCallback(() => {
     setUsers(getAllUsers())
     setApps(getPendingApplications())
+    setRejectedApps(getRejectedApplications())
     setStats(getStats())
-  }, [getAllUsers, getPendingApplications, getStats])
+  }, [getAllUsers, getPendingApplications, getRejectedApplications, getStats])
 
   useEffect(() => {
     reload()
+    const onStorage = (e) => {
+      if (e.key === 'thulix_users') reload()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [reload])
+
+  // Refresh handler with visible spinner + feedback.
+  const handleRefresh = () => {
+    if (refreshing) return
+    setRefreshing(true)
+    reload()
+    flash('Dashboard refreshed.')
+    setTimeout(() => setRefreshing(false), 600)
+  }
 
   const flash = (msg, ok = true) => {
     setNotice({ msg, ok })
@@ -77,9 +95,25 @@ export default function AdminDashboard() {
     }
   }
 
+  const removeApp = async (id, name) => {
+    setBusy((b) => ({ ...b, [id]: 'removing' }))
+    try {
+      await deleteUser(id)
+      reload()
+      flash(`${name} removed.`)
+    } catch (e) {
+      flash(e.message || 'Something went wrong.', false)
+    } finally {
+      setBusy((b) => ({ ...b, [id]: undefined }))
+      setConfirmingRemove(null)
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return users.filter((u) => {
+      // Rejected trainer/recruiter applications live in the Rejected section only.
+      if ((u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected') return false
       if (roleFilter !== 'all' && u.role !== roleFilter) return false
       if (statusFilter !== 'all' && u.status !== statusFilter) return false
       if (!q) return true
@@ -103,7 +137,7 @@ export default function AdminDashboard() {
     { label: 'Total Users', value: stats.total, icon: Users, color: '#94A3B8' },
     { label: 'Active', value: stats.active, icon: UserCheck, color: '#10B981' },
     { label: 'Pending', value: stats.pending, icon: Clock, color: '#F59E0B' },
-    { label: 'Rejected', value: stats.rejected, icon: UserX, color: '#EC4899' },
+    { label: 'Rejected', value: stats.rejectedApps, icon: UserX, color: '#EC4899' },
   ]
 
   return (
@@ -149,10 +183,12 @@ export default function AdminDashboard() {
           </div>
           <button
             type="button"
-            onClick={reload}
-            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.2)] px-4 py-2 text-sm font-semibold text-mist transition-colors hover:text-snow"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.2)] px-4 py-2 text-sm font-semibold text-mist transition-colors hover:text-snow disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <RefreshCw size={15} aria-hidden="true" /> Refresh
+            <RefreshCw size={15} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
 
@@ -263,6 +299,92 @@ export default function AdminDashboard() {
           )}
         </section>
 
+        {/* Rejected applications */}
+        <section aria-label="Rejected applications" className="mt-10">
+          <div className="mb-4 flex items-center gap-2.5">
+            <UserX size={18} className="text-blush" />
+            <h2 className="font-heading text-xl font-bold text-snow">Rejected Applications</h2>
+            <span className="rounded-full bg-blush/15 px-2.5 py-0.5 text-xs font-semibold text-blush">{rejectedApps.length}</span>
+          </div>
+
+          {rejectedApps.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
+              <ShieldCheck size={18} className="text-success" /> No rejected applications.
+            </div>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-[rgba(236,72,153,0.2)] bg-abyss-2/40">
+              <div className="divide-y divide-[rgba(148,163,184,0.08)]">
+                {rejectedApps.map((a) => (
+                  <div key={a.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                      <span
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-base font-bold text-white"
+                        style={{ background: `${ROLE_TINTS[a.role]}33`, color: ROLE_TINTS[a.role] }}
+                      >
+                        {(a.name || 'U').slice(0, 1).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate font-semibold text-snow">{a.name}</p>
+                          <RoleBadge role={a.role} />
+                          <StatusBadge status={a.status} />
+                        </div>
+                        <p className="flex items-center gap-1.5 truncate text-sm text-mist">
+                          <Mail size={12} className="shrink-0" aria-hidden="true" /> {a.email}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-mist/70">
+                          {a.role === 'trainer'
+                            ? [a.meta?.professionalTitle, a.meta?.expertise, a.meta?.experience].filter(Boolean).join(' · ')
+                            : [a.meta?.companyName, a.meta?.industry, a.meta?.companyLocation].filter(Boolean).join(' · ')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={!!busy[a.id]}
+                        onClick={() => act(a.id, 'active', `${a.name} reactivated — they can now sign in.`)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-2 text-sm font-semibold text-success transition-colors hover:bg-[rgba(16,185,129,0.15)] disabled:opacity-50"
+                      >
+                        <Undo2 size={15} aria-hidden="true" /> {busy[a.id] === 'active' ? 'Saving…' : 'Reactivate'}
+                      </button>
+                      {confirmingRemove === a.id ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={!!busy[a.id]}
+                            onClick={() => removeApp(a.id, a.name)}
+                            className="inline-flex items-center gap-1 rounded-xl bg-[rgba(236,72,153,0.9)] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[rgba(236,72,153,1)] disabled:opacity-50"
+                          >
+                            <Trash2 size={14} aria-hidden="true" /> {busy[a.id] === 'removing' ? 'Removing…' : 'Confirm'}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!!busy[a.id]}
+                            onClick={() => setConfirmingRemove(null)}
+                            className="inline-flex items-center rounded-xl border border-[rgba(148,163,184,0.2)] px-3 py-2 text-sm text-mist transition-colors hover:text-snow"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!!busy[a.id]}
+                          onClick={() => setConfirmingRemove(a.id)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(236,72,153,0.3)] bg-[rgba(236,72,153,0.08)] px-4 py-2 text-sm font-semibold text-blush transition-colors hover:bg-[rgba(236,72,153,0.15)] disabled:opacity-50"
+                        >
+                          <Trash2 size={15} aria-hidden="true" /> Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* All users */}
         <section aria-label="All users" className="mt-10">
           <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -290,7 +412,6 @@ export default function AdminDashboard() {
                 <option value="all">All statuses</option>
                 <option value="active">Active</option>
                 <option value="pending">Pending</option>
-                <option value="rejected">Rejected</option>
               </select>
             </div>
           </div>

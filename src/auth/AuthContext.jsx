@@ -59,8 +59,10 @@ export function AuthProvider({ children }) {
       dashboardPath,
       getAllUsers: auth.getAllUsers,
       getPendingApplications: auth.getPendingApplications,
+      getRejectedApplications: auth.getRejectedApplications,
       getStats: auth.getStats,
       setUserStatus: auth.setUserStatus,
+      deleteUser: auth.deleteUser,
     }),
     [user, loading, login, logout, registerLearner, registerTrainer, registerRecruiter, dashboardPath],
   )
