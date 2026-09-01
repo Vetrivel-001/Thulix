@@ -11,6 +11,21 @@ import Hero from './components/sections/Hero'
 import Placeholder from './components/pages/Placeholder'
 import { getLenis } from './lib/smooth-scroll'
 
+// Auth pages
+import Login from './pages/Login'
+import GetStarted from './pages/GetStarted'
+import LearnerRegister from './pages/LearnerRegister'
+import TrainerRegister from './pages/TrainerRegister'
+import RecruiterRegister from './pages/RecruiterRegister'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import VerifyPage from './pages/VerifyPage'
+import ApprovalStatusPage from './pages/ApprovalStatusPage'
+import Unauthorized from './pages/Unauthorized'
+import AdminDashboard from './pages/AdminDashboard'
+import DashboardPlaceholder from './components/auth/DashboardPlaceholder'
+import { ProtectedRoute, RoleGuard, RequireLoggedIn } from './auth/guards'
+
 const TrustLogos = lazy(() => import('./components/sections/TrustLogos'))
 const Problem = lazy(() => import('./components/sections/Problem'))
 const Ecosystem = lazy(() => import('./components/sections/Ecosystem'))
@@ -64,17 +79,38 @@ function Home() {
   )
 }
 
+// Routes that render the full standalone auth/dashboard shell (no Navbar/Footer/ChatWidget).
+const STANDALONE_PATHS = [
+  '/login',
+  '/get-started',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/verify-phone',
+  '/unauthorized',
+  '/learner',
+  '/trainer',
+  '/recruiter',
+  '/admin',
+]
+
+function isStandalone(pathname) {
+  return STANDALONE_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'))
+}
+
 export default function App() {
   const location = useLocation()
+  const standalone = isStandalone(location.pathname)
 
   return (
     <>
       <SmoothScroll />
       <ScrollProgress />
       <CursorGlow />
-      <ChatWidget />
+      {!standalone && <ChatWidget />}
       <ScrollManager />
-      <Navbar />
+      {!standalone && <Navbar />}
 
       <AnimatePresence mode="wait">
         <motion.main
@@ -86,13 +122,69 @@ export default function App() {
         >
           <Routes location={location}>
             <Route path="/" element={<Home />} />
+
+            {/* Auth routes */}
+            <Route path="/login" element={<RequireLoggedIn><Login /></RequireLoggedIn>} />
+            <Route path="/get-started" element={<GetStarted />} />
+            <Route path="/register/learner" element={<LearnerRegister />} />
+            <Route path="/register/trainer" element={<TrainerRegister />} />
+            <Route path="/register/recruiter" element={<RecruiterRegister />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/verify-email" element={<VerifyPage />} />
+            <Route path="/verify-phone" element={<VerifyPage />} />
+            <Route path="/unauthorized" element={<Unauthorized />} />
+
+            {/* Approval status pages (authenticated) */}
+            <Route path="/trainer/pending" element={<ProtectedRoute><ApprovalStatusPage variant="pending" role="trainer" /></ProtectedRoute>} />
+            <Route path="/trainer/rejected" element={<ProtectedRoute><ApprovalStatusPage variant="rejected" role="trainer" /></ProtectedRoute>} />
+            <Route path="/recruiter/pending" element={<ProtectedRoute><ApprovalStatusPage variant="pending" role="recruiter" /></ProtectedRoute>} />
+            <Route path="/recruiter/rejected" element={<ProtectedRoute><ApprovalStatusPage variant="rejected" role="recruiter" /></ProtectedRoute>} />
+
+            {/* Role dashboards */}
+            <Route
+              path="/learner/dashboard"
+              element={
+                <RoleGuard role="learner">
+                  <DashboardPlaceholder />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/trainer/dashboard"
+              element={
+                <RoleGuard role="trainer">
+                  <DashboardPlaceholder />
+                </RoleGuard>
+              }
+            />
+            <Route
+              path="/recruiter/dashboard"
+              element={
+                <RoleGuard role="recruiter">
+                  <DashboardPlaceholder />
+                </RoleGuard>
+              }
+            />
+
+            {/* Admin dashboard */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <RoleGuard role="admin">
+                  <AdminDashboard />
+                </RoleGuard>
+              }
+            />
+
+            {/* Catch-all for marketing pages only */}
             <Route path="/:page" element={<Placeholder />} />
             <Route path="*" element={<Placeholder />} />
           </Routes>
         </motion.main>
       </AnimatePresence>
 
-      <Footer />
+      {!standalone && <Footer />}
     </>
   )
 }

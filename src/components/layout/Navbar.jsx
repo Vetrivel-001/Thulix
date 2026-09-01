@@ -5,6 +5,8 @@ import { Menu, X, LogIn, ArrowRight, ChevronDown } from 'lucide-react'
 import { NAV_LINKS } from '../../lib/data'
 import { scrollToId } from '../../lib/smooth-scroll'
 import MagneticButton from '../ui/MagneticButton'
+import AccountMenu from '../auth/AccountMenu'
+import { useAuth } from '../../auth/AuthContext'
 
 function Logo() {
   return (
@@ -104,6 +106,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24)
@@ -152,17 +155,23 @@ export default function Navbar() {
         </div>
 
         <div className="hidden items-center gap-3 lg:flex">
-          <Link
-            to="/login"
-            className="group inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-mist transition-all duration-300 hover:border-electric/30 hover:text-snow hover:shadow-glow-electric"
-          >
-            <LogIn size={16} aria-hidden="true" />
-            Sign In
-          </Link>
-          <MagneticButton to="/get-started" variant="primary">
-            Get Started
-            <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" />
-          </MagneticButton>
+          {user ? (
+            <AccountMenu align="right" />
+          ) : (
+            <>
+              <Link
+                to="/login"
+                className="group inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-mist transition-all duration-300 hover:border-electric/30 hover:text-snow hover:shadow-glow-electric"
+              >
+                <LogIn size={16} aria-hidden="true" />
+                Sign In
+              </Link>
+              <MagneticButton to="/get-started" variant="primary">
+                Get Started
+                <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" />
+              </MagneticButton>
+            </>
+          )}
         </div>
 
         <button
@@ -203,12 +212,18 @@ export default function Navbar() {
                 FAQ
               </button>
               <div className="mt-4 flex flex-col gap-3">
-                <MagneticButton to="/login" variant="ghost">
-                  <LogIn size={16} aria-hidden="true" /> Sign In
-                </MagneticButton>
-                <MagneticButton to="/get-started" variant="primary">
-                  Get Started <ArrowRight size={16} aria-hidden="true" />
-                </MagneticButton>
+                {user ? (
+                  <AccountMenu align="left" />
+                ) : (
+                  <>
+                    <MagneticButton to="/login" variant="ghost">
+                      <LogIn size={16} aria-hidden="true" /> Sign In
+                    </MagneticButton>
+                    <MagneticButton to="/get-started" variant="primary">
+                      Get Started <ArrowRight size={16} aria-hidden="true" />
+                    </MagneticButton>
+                  </>
+                )}
               </div>
             </div>
           </motion.div>
