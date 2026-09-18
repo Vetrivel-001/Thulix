@@ -283,11 +283,18 @@ export function getPendingApplications() {
   )
 }
 
-// Rejected trainer/recruiter applications (for the dedicated Rejected section).
-export function getRejectedApplications() {
-  return getAllUsers().filter(
-    (u) => (u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected',
+// A rejected application = rejected trainer/recruiter/learner (deactivated learner
+// is treated the same as a rejected application for the Rejected section).
+export function isRejectedApplication(u) {
+  return (
+    (u.role === 'trainer' || u.role === 'recruiter' || u.role === 'learner') &&
+    u.status === 'rejected'
   )
+}
+
+// Rejected applications (for the dedicated Rejected section).
+export function getRejectedApplications() {
+  return getAllUsers().filter(isRejectedApplication)
 }
 
 // Permanently remove a user/application from the store.
@@ -309,9 +316,8 @@ export function getStats() {
   let rejected = 0
   let rejectedApps = 0
   for (const u of users) {
-    const isRejectedApp = (u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected'
     // Rejected applications are NOT counted toward users or role totals.
-    if (isRejectedApp) {
+    if (isRejectedApplication(u)) {
       rejected += 1
       rejectedApps += 1
       continue
@@ -321,9 +327,7 @@ export function getStats() {
     else if (u.status === 'pending') pending += 1
     else if (u.status === 'rejected') rejected += 1
   }
-  const nonRejected = users.filter(
-    (u) => !((u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected'),
-  )
+  const nonRejected = users.filter((u) => !isRejectedApplication(u))
   const sorted = [...nonRejected].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   return {
     total: nonRejected.length,

@@ -5,6 +5,7 @@ import {
   Mail, RefreshCw, Search, ShieldCheck, Trash2, Undo2, UserCheck, UserX, Users, X,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
+import { isRejectedApplication } from '../auth/AuthService'
 import { ROLE_LABELS } from '../auth/permission'
 import AccountMenu from '../components/auth/AccountMenu'
 
@@ -112,8 +113,8 @@ export default function AdminDashboard() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return users.filter((u) => {
-      // Rejected trainer/recruiter applications live in the Rejected section only.
-      if ((u.role === 'trainer' || u.role === 'recruiter') && u.status === 'rejected') return false
+      // Rejected applications (trainer/recruiter/learner) live in the Rejected section only.
+      if (isRejectedApplication(u)) return false
       if (roleFilter !== 'all' && u.role !== roleFilter) return false
       if (statusFilter !== 'all' && u.status !== statusFilter) return false
       if (!q) return true
@@ -335,7 +336,9 @@ export default function AdminDashboard() {
                         <p className="mt-0.5 truncate text-xs text-mist/70">
                           {a.role === 'trainer'
                             ? [a.meta?.professionalTitle, a.meta?.expertise, a.meta?.experience].filter(Boolean).join(' · ')
-                            : [a.meta?.companyName, a.meta?.industry, a.meta?.companyLocation].filter(Boolean).join(' · ')}
+                            : a.role === 'learner'
+                              ? [a.meta?.degree, a.meta?.department, a.meta?.educationStatus, a.meta?.city].filter(Boolean).join(' · ')
+                              : [a.meta?.companyName, a.meta?.industry, a.meta?.companyLocation].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                     </div>
