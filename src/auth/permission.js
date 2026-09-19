@@ -16,12 +16,12 @@ export const ROLE_LABELS = {
 }
 
 // Default destination per role (used for post-login redirect).
-// Learners are enrolled/enquiries — they land on the public home page, where
-// the Navbar account menu exposes their Profile / Enrollment.
+// Learners, trainers and recruiters have no dashboard — they land on the public
+// home page, where the Navbar account menu exposes their Profile / Application.
 export const ROLE_DASHBOARDS = {
   learner: '/',
-  trainer: '/trainer/dashboard',
-  recruiter: '/recruiter/dashboard',
+  trainer: '/',
+  recruiter: '/',
   admin: '/admin/dashboard',
 }
 
@@ -31,13 +31,6 @@ export const ROLE_HOME = {
   trainer: '/trainer',
   recruiter: '/recruiter',
   admin: '/admin',
-}
-
-// Roles that require admin approval before becoming active.
-export const REVIEW_ROLES = ['trainer', 'recruiter']
-
-export function isReviewRole(role) {
-  return REVIEW_ROLES.includes(role)
 }
 
 export function isAdmin(role) {

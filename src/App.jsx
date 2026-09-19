@@ -20,11 +20,9 @@ import RecruiterRegister from './pages/RecruiterRegister'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
-import ApprovalStatusPage from './pages/ApprovalStatusPage'
 import Unauthorized from './pages/Unauthorized'
 import ProfilePage from './pages/ProfilePage'
 import AdminDashboard from './pages/AdminDashboard'
-import DashboardPlaceholder from './components/auth/DashboardPlaceholder'
 import { ProtectedRoute, RoleGuard, RequireLoggedIn } from './auth/guards'
 
 const TrustLogos = lazy(() => import('./components/sections/TrustLogos'))
@@ -91,8 +89,6 @@ const STANDALONE_PATHS = [
   '/verify-phone',
   '/unauthorized',
   '/learner',
-  '/trainer',
-  '/recruiter',
   '/admin',
 ]
 
@@ -136,37 +132,13 @@ export default function App() {
             <Route path="/verify-phone" element={<VerifyPage />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Approval status pages (authenticated) */}
-            <Route path="/trainer/pending" element={<ProtectedRoute><ApprovalStatusPage variant="pending" role="trainer" /></ProtectedRoute>} />
-            <Route path="/trainer/rejected" element={<ProtectedRoute><ApprovalStatusPage variant="rejected" role="trainer" /></ProtectedRoute>} />
-            <Route path="/recruiter/pending" element={<ProtectedRoute><ApprovalStatusPage variant="pending" role="recruiter" /></ProtectedRoute>} />
-            <Route path="/recruiter/rejected" element={<ProtectedRoute><ApprovalStatusPage variant="rejected" role="recruiter" /></ProtectedRoute>} />
-
-            {/* Learner profile (learners have no dashboard — enrollments only) */}
+            {/* Profile (learners, trainers and recruiters have no dashboard — enquiries/applications only) */}
             <Route
               path="/profile"
               element={
                 <ProtectedRoute>
                   <ProfilePage />
                 </ProtectedRoute>
-              }
-            />
-
-            {/* Role dashboards */}
-            <Route
-              path="/trainer/dashboard"
-              element={
-                <RoleGuard role="trainer">
-                  <DashboardPlaceholder />
-                </RoleGuard>
-              }
-            />
-            <Route
-              path="/recruiter/dashboard"
-              element={
-                <RoleGuard role="recruiter">
-                  <DashboardPlaceholder />
-                </RoleGuard>
               }
             />
 

@@ -2,16 +2,30 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Activity, AlertTriangle, ArrowRight, Bell, Check, Clock, GraduationCap, LayoutDashboard,
-  Mail, RefreshCw, Search, ShieldCheck, Trash2, Undo2, UserCheck, UserX, Users, X,
+  Mail, RefreshCw, Search, ShieldCheck, Trash2, Undo2, UserCheck, UserX, Users, X, Presentation, Briefcase,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { isRejectedApplication, ENROLLMENT_STATUS_LABELS } from '../auth/AuthService'
+import {
+  isRejectedApplication,
+  ENROLLMENT_STATUS_LABELS,
+  TRAINER_APPLICATION_STATUS_LABELS,
+  RECRUITER_APPLICATION_STATUS_LABELS,
+} from '../auth/AuthService'
 import { ROLE_LABELS } from '../auth/permission'
 import AccountMenu from '../components/auth/AccountMenu'
 
 const TINT = '#F59E0B'
 const ROLE_TINTS = { learner: '#8B5CF6', trainer: '#06B6D4', recruiter: '#10B981', admin: '#F59E0B' }
 const ENROLLMENT_TINTS = { new: '#F59E0B', contacted: '#06B6D4', in_progress: '#8B5CF6', enrolled: '#10B981', closed: '#94A3B8' }
+const TRAINER_TINTS = { new: '#F59E0B', reviewed: '#06B6D4', accepted: '#10B981', not_accepted: '#EC4899', closed: '#94A3B8' }
+const RECRUITER_TINTS = { new: '#F59E0B', reviewed: '#06B6D4', accepted: '#10B981', not_accepted: '#EC4899', closed: '#94A3B8' }
+
+// ₹ amount from a stored numeric salary (never a formatted string).
+function formatSalary(value) {
+  const n = Number(value)
+  if (!n) return '—'
+  return `₹${n.toLocaleString('en-IN')}`
+}
 
 const STATUS_STYLE = {
   active: { label: 'Active', color: '#10B981' },
@@ -41,11 +55,13 @@ function StatusBadge({ status }) {
 }
 
 export default function AdminDashboard() {
-  const { user, getAllUsers, getPendingApplications, getRejectedApplications, getStats, setUserStatus, deleteUser, getLearnerEnrollments, updateEnrollmentStatus } = useAuth()
+  const { user, getAllUsers, getPendingApplications, getRejectedApplications, getStats, setUserStatus, deleteUser, getLearnerEnrollments, updateEnrollmentStatus, getTrainerApplications, updateTrainerApplicationStatus, getRecruiterApplications, updateRecruiterApplicationStatus } = useAuth()
   const [users, setUsers] = useState([])
   const [apps, setApps] = useState([])
   const [rejectedApps, setRejectedApps] = useState([])
   const [enrollments, setEnrollments] = useState([])
+  const [trainerApps, setTrainerApps] = useState([])
+  const [recruiterApps, setRecruiterApps] = useState([])
   const [stats, setStats] = useState(null)
   const [busy, setBusy] = useState({})
   const [notice, setNotice] = useState(null)
@@ -55,14 +71,18 @@ export default function AdminDashboard() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [enrFilter, setEnrFilter] = useState('all')
+  const [trnFilter, setTrnFilter] = useState('all')
+  const [rcrFilter, setRcrFilter] = useState('all')
 
   const reload = useCallback(() => {
     setUsers(getAllUsers())
     setApps(getPendingApplications())
     setRejectedApps(getRejectedApplications())
     setEnrollments(getLearnerEnrollments())
+    setTrainerApps(getTrainerApplications())
+    setRecruiterApps(getRecruiterApplications())
     setStats(getStats())
-  }, [getAllUsers, getPendingApplications, getRejectedApplications, getLearnerEnrollments, getStats])
+  }, [getAllUsers, getPendingApplications, getRejectedApplications, getLearnerEnrollments, getTrainerApplications, getRecruiterApplications, getStats])
 
   useEffect(() => {
     reload()
@@ -114,6 +134,34 @@ export default function AdminDashboard() {
     }
   }
 
+  const changeTrainerStatus = async (id, status) => {
+    const entry = trainerApps.find((x) => x.id === id)
+    setBusy((b) => ({ ...b, [`trn_${id}`]: status }))
+    try {
+      await updateTrainerApplicationStatus(id, status)
+      reload()
+      flash(`${entry?.name || 'Trainer'} application marked ${TRAINER_APPLICATION_STATUS_LABELS[status] || status}.`)
+    } catch (e) {
+      flash(e.message || 'Something went wrong.', false)
+    } finally {
+      setBusy((b) => ({ ...b, [`trn_${id}`]: undefined }))
+    }
+  }
+
+  const changeRecruiterStatus = async (id, status) => {
+    const entry = recruiterApps.find((x) => x.id === id)
+    setBusy((b) => ({ ...b, [`rcr_${id}`]: status }))
+    try {
+      await updateRecruiterApplicationStatus(id, status)
+      reload()
+      flash(`${entry?.name || 'Recruiter'} application marked ${RECRUITER_APPLICATION_STATUS_LABELS[status] || status}.`)
+    } catch (e) {
+      flash(e.message || 'Something went wrong.', false)
+    } finally {
+      setBusy((b) => ({ ...b, [`rcr_${id}`]: undefined }))
+    }
+  }
+
   const removeApp = async (id, name) => {
     setBusy((b) => ({ ...b, [id]: 'removing' }))
     try {
@@ -148,6 +196,16 @@ export default function AdminDashboard() {
     if (enrFilter === 'all') return enrollments
     return enrollments.filter((e) => (e.enrollment?.enrollmentStatus || 'new') === enrFilter)
   }, [enrollments, enrFilter])
+
+  const displayedTrainerApps = useMemo(() => {
+    if (trnFilter === 'all') return trainerApps
+    return trainerApps.filter((t) => (t.application?.applicationStatus || 'new') === trnFilter)
+  }, [trainerApps, trnFilter])
+
+  const displayedRecruiterApps = useMemo(() => {
+    if (rcrFilter === 'all') return recruiterApps
+    return recruiterApps.filter((r) => (r.application?.applicationStatus || 'new') === rcrFilter)
+  }, [recruiterApps, rcrFilter])
 
   if (!stats) {
     return (
@@ -294,7 +352,7 @@ export default function AdminDashboard() {
                         <p className="mt-0.5 truncate text-xs text-mist/70">
                           {a.role === 'trainer'
                             ? [a.meta?.professionalTitle, a.meta?.expertise, a.meta?.experience].filter(Boolean).join(' · ')
-                            : [a.meta?.companyName, a.meta?.industry, a.meta?.companyLocation].filter(Boolean).join(' · ')}
+                            : [a.meta?.companyName, a.meta?.companyLocation].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                     </div>
@@ -361,7 +419,7 @@ export default function AdminDashboard() {
                             ? [a.meta?.professionalTitle, a.meta?.expertise, a.meta?.experience].filter(Boolean).join(' · ')
                             : a.role === 'learner'
                               ? [a.meta?.degree, a.meta?.department, a.meta?.educationStatus, a.meta?.city].filter(Boolean).join(' · ')
-                              : [a.meta?.companyName, a.meta?.industry, a.meta?.companyLocation].filter(Boolean).join(' · ')}
+                              : [a.meta?.companyName, a.meta?.companyLocation].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                     </div>
@@ -514,6 +572,234 @@ export default function AdminDashboard() {
               {displayedEnrollments.length === 0 && (
                 <div className="flex items-center gap-3 p-6 text-sm text-mist">
                   <AlertTriangle size={18} className="text-golden" /> No enquiries match this status.
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Trainer applications */}
+        <section aria-label="Trainer applications" className="mt-10">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <Presentation size={18} className="text-electric" />
+              <h2 className="font-heading text-xl font-bold text-snow">Trainer Applications</h2>
+              <span className="rounded-full bg-electric/15 px-2.5 py-0.5 text-xs font-semibold text-electric">{displayedTrainerApps.length}</span>
+            </div>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <select
+                value={trnFilter}
+                onChange={(e) => setTrnFilter(e.target.value)}
+                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-electric/50"
+                aria-label="Filter trainer applications by status"
+              >
+                <option value="all">All statuses</option>
+                {Object.entries(TRAINER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {trainerApps.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
+              <ShieldCheck size={18} className="text-success" /> No trainer applications yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-[rgba(6,182,212,0.24)] bg-abyss-2/40">
+              <table className="w-full min-w-[1040px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
+                    <th className="px-5 py-3 font-semibold">Application ID</th>
+                    <th className="px-5 py-3 font-semibold">Trainer</th>
+                    <th className="px-5 py-3 font-semibold">Phone</th>
+                    <th className="px-5 py-3 font-semibold">Course Offered</th>
+                    <th className="px-5 py-3 font-semibold">Known Skills</th>
+                    <th className="px-5 py-3 font-semibold">Experience</th>
+                    <th className="px-5 py-3 font-semibold">Salary Exp.</th>
+                    <th className="px-5 py-3 font-semibold">Status</th>
+                    <th className="px-5 py-3 font-semibold">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
+                  {displayedTrainerApps.map((t) => {
+                    const current = t.application?.applicationStatus || 'new'
+                    return (
+                      <tr key={t.id} className="align-middle">
+                        <td className="px-5 py-3.5">
+                          <span className="rounded-lg bg-electric/10 px-2 py-1 font-mono text-xs font-semibold text-electric">
+                            {t.application?.applicationId || '—'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white"
+                              style={{ background: `${ROLE_TINTS.trainer}33`, color: ROLE_TINTS.trainer }}
+                            >
+                              {(t.name || 'U').slice(0, 1).toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-snow">{t.name}</p>
+                              <p className="truncate text-xs text-mist">{t.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{t.application?.phone || '—'}</td>
+                        <td className="max-w-[180px] truncate px-5 py-3.5 text-snow">{t.application?.courseOffered || '—'}</td>
+                        <td className="max-w-[200px] truncate px-5 py-3.5 text-mist">{(t.application?.knownSkills || []).join(', ') || '—'}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{t.application?.experience || '—'}</td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{formatSalary(t.application?.salaryExpectation)}</td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col items-start gap-1.5">
+                            <span
+                              className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                              style={{
+                                background: `${TRAINER_TINTS[current] || '#F59E0B'}1a`,
+                                color: TRAINER_TINTS[current] || '#F59E0B',
+                              }}
+                            >
+                              {TRAINER_APPLICATION_STATUS_LABELS[current] || current}
+                            </span>
+                            <select
+                              value={current}
+                              disabled={!!busy[`trn_${t.id}`]}
+                              onChange={(ev) => changeTrainerStatus(t.id, ev.target.value)}
+                              aria-label={`Application status for ${t.name}`}
+                              className="rounded-lg border border-[rgba(148,163,184,0.18)] bg-abyss-2/70 px-2 py-1 text-xs text-snow outline-none transition-colors focus:border-electric/60 disabled:opacity-50"
+                            >
+                              {Object.entries(TRAINER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">
+                          {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {displayedTrainerApps.length === 0 && (
+                <div className="flex items-center gap-3 p-6 text-sm text-mist">
+                  <AlertTriangle size={18} className="text-golden" /> No applications match this status.
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* Recruiter applications */}
+        <section aria-label="Recruiter applications" className="mt-10">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <Briefcase size={18} className="text-mint" />
+              <h2 className="font-heading text-xl font-bold text-snow">Recruiter Applications</h2>
+              <span className="rounded-full bg-mint/15 px-2.5 py-0.5 text-xs font-semibold text-mint">{displayedRecruiterApps.length}</span>
+            </div>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <select
+                value={rcrFilter}
+                onChange={(e) => setRcrFilter(e.target.value)}
+                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-mint/50"
+                aria-label="Filter recruiter applications by status"
+              >
+                <option value="all">All statuses</option>
+                {Object.entries(RECRUITER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {recruiterApps.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
+              <ShieldCheck size={18} className="text-success" /> No recruiter applications yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-[rgba(16,185,129,0.24)] bg-abyss-2/40">
+              <table className="w-full min-w-[1180px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
+                    <th className="px-5 py-3 font-semibold">Application ID</th>
+                    <th className="px-5 py-3 font-semibold">Recruiter</th>
+                    <th className="px-5 py-3 font-semibold">Phone</th>
+                    <th className="px-5 py-3 font-semibold">Job Title</th>
+                    <th className="px-5 py-3 font-semibold">Company Name</th>
+                    <th className="px-5 py-3 font-semibold">Company Email / Domain</th>
+                    <th className="px-5 py-3 font-semibold">Website</th>
+                    <th className="px-5 py-3 font-semibold">Location</th>
+                    <th className="px-5 py-3 font-semibold">Status</th>
+                    <th className="px-5 py-3 font-semibold">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
+                  {displayedRecruiterApps.map((r) => {
+                    const current = r.application?.applicationStatus || 'new'
+                    return (
+                      <tr key={r.id} className="align-middle">
+                        <td className="px-5 py-3.5">
+                          <span className="rounded-lg bg-mint/10 px-2 py-1 font-mono text-xs font-semibold text-mint">
+                            {r.application?.applicationId || '—'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white"
+                              style={{ background: `${ROLE_TINTS.recruiter}33`, color: ROLE_TINTS.recruiter }}
+                            >
+                              {(r.name || 'U').slice(0, 1).toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-snow">{r.name}</p>
+                              <p className="truncate text-xs text-mist">{r.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{r.application?.phone || '—'}</td>
+                        <td className="max-w-[160px] truncate px-5 py-3.5 text-snow">{r.application?.jobTitle || '—'}</td>
+                        <td className="max-w-[180px] truncate px-5 py-3.5 text-snow">{r.application?.companyName || '—'}</td>
+                        <td className="max-w-[180px] truncate px-5 py-3.5 text-mist">{r.application?.companyEmail || '—'}</td>
+                        <td className="max-w-[180px] truncate px-5 py-3.5 text-mist">{r.application?.website || '—'}</td>
+                        <td className="max-w-[160px] truncate px-5 py-3.5 text-mist">{r.application?.companyLocation || '—'}</td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col items-start gap-1.5">
+                            <span
+                              className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                              style={{
+                                background: `${RECRUITER_TINTS[current] || '#F59E0B'}1a`,
+                                color: RECRUITER_TINTS[current] || '#F59E0B',
+                              }}
+                            >
+                              {RECRUITER_APPLICATION_STATUS_LABELS[current] || current}
+                            </span>
+                            <select
+                              value={current}
+                              disabled={!!busy[`rcr_${r.id}`]}
+                              onChange={(ev) => changeRecruiterStatus(r.id, ev.target.value)}
+                              aria-label={`Application status for ${r.name}`}
+                              className="rounded-lg border border-[rgba(148,163,184,0.18)] bg-abyss-2/70 px-2 py-1 text-xs text-snow outline-none transition-colors focus:border-mint/60 disabled:opacity-50"
+                            >
+                              {Object.entries(RECRUITER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">
+                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {displayedRecruiterApps.length === 0 && (
+                <div className="flex items-center gap-3 p-6 text-sm text-mist">
+                  <AlertTriangle size={18} className="text-golden" /> No applications match this status.
                 </div>
               )}
             </div>

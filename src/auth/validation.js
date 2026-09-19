@@ -73,3 +73,27 @@ export function validateRequired(value, label) {
   if (!required(value)) return `Please enter your ${label}.`
   return ''
 }
+
+// Numeric amount (e.g. salary expectation). Stored as a clean number, so the
+// input may contain separators/currency but must resolve to a positive value.
+export function validateAmount(value, label = 'amount') {
+  const digits = String(value ?? '').replace(/[^0-9]/g, '')
+  if (!digits) return `Please enter your ${label}.`
+  if (Number(digits) <= 0) return `Please enter a valid ${label}.`
+  return ''
+}
+
+// Optional URL (e.g. company website). Empty is fine; non-empty must be a URL.
+export function validateUrl(value, label = 'website URL') {
+  if (!required(value)) return ''
+  if (!isUrl(value)) return `Please enter a valid ${label}.`
+  return ''
+}
+
+// Company email / domain accepts either an email address or a bare domain
+// (e.g. "careers@acme.com" or "acme.com").
+export function validateCompanyEmail(value) {
+  if (!required(value)) return 'Please enter your company email / domain.'
+  if (isEmail(value) || isUrl(value)) return ''
+  return 'Please enter a valid company email or domain.'
+}

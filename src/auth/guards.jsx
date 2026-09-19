@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { canAccessRoute, isReviewRole, roleFromPath, ROLE_DASHBOARDS } from '../auth/permission'
+import { canAccessRoute, roleFromPath, ROLE_DASHBOARDS } from '../auth/permission'
 
 // Full-screen loading matched to the app aesthetic.
 function RouteLoader() {
@@ -37,19 +37,6 @@ export function RoleGuard({ role, children }) {
   const area = roleFromPath(location.pathname)
   if (!canAccessRoute(user.role, location.pathname) && area !== user.role) {
     return <Navigate to="/unauthorized" replace />
-  }
-
-  // Status gating for review roles (trainer / recruiter).
-  if (isReviewRole(user.role)) {
-    if (user.status === 'pending') {
-      return <Navigate to={`/${user.role}/pending`} replace />
-    }
-    if (user.status === 'rejected') {
-      return <Navigate to={`/${user.role}/rejected`} replace />
-    }
-    if (user.status !== 'active') {
-      return <Navigate to="/unauthorized" replace />
-    }
   }
 
   return children

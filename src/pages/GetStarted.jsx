@@ -19,10 +19,10 @@ const ROLES = [
   {
     key: 'trainer',
     title: 'Trainer',
-    desc: 'Teach, earn and build your audience.',
+    desc: 'Apply to share your expertise and teach on Thulix.',
     icon: Presentation,
     accent: '#06B6D4',
-    features: ['Create Courses', 'Live Classes', 'Mentorship'],
+    features: ['Apply to Teach', 'Live Classes', 'Mentorship'],
     to: '/register/trainer',
   },
   {

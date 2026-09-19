@@ -36,12 +36,29 @@ export function AuthProvider({ children }) {
 
   const registerLearner = useCallback((data) => register(auth.registerLearner, data), [register])
   const registerTrainer = useCallback((data) => register(auth.registerTrainer, data), [register])
-  const registerRecruiter = useCallback((data) => register(auth.registerRecruiter, data), [register])
 
   // Learner course-enrollment flow: create account + enquiry, then keep the
   // learner authenticated (session saved exactly like the other registers).
   const enrollLearner = useCallback(async (data) => {
     const result = await auth.createLearnerEnrollment(data)
+    auth.saveSession(result.user)
+    setUser(result.user)
+    return result
+  }, [])
+
+  // Trainer application flow: create account + application, then keep the
+  // trainer authenticated (session saved exactly like the other registers).
+  const enrollTrainer = useCallback(async (data) => {
+    const result = await auth.createTrainerApplication(data)
+    auth.saveSession(result.user)
+    setUser(result.user)
+    return result
+  }, [])
+
+  // Recruiter application flow: create account + application, then keep the
+  // recruiter authenticated (session saved exactly like the other registers).
+  const enrollRecruiter = useCallback(async (data) => {
+    const result = await auth.createRecruiterApplication(data)
     auth.saveSession(result.user)
     setUser(result.user)
     return result
@@ -64,8 +81,9 @@ export function AuthProvider({ children }) {
       logout,
       registerLearner,
       registerTrainer,
-      registerRecruiter,
       enrollLearner,
+      enrollTrainer,
+      enrollRecruiter,
       dashboardPath,
       getAllUsers: auth.getAllUsers,
       getPendingApplications: auth.getPendingApplications,
@@ -77,9 +95,19 @@ export function AuthProvider({ children }) {
       getLearnerEnrollment: auth.getLearnerEnrollment,
       updateEnrollmentStatus: auth.updateEnrollmentStatus,
       updateLearnerEnrollment: auth.updateLearnerEnrollment,
+      getTrainerApplications: auth.getTrainerApplications,
+      getTrainerApplication: auth.getTrainerApplication,
+      updateTrainerApplication: auth.updateTrainerApplication,
+      updateTrainerApplicationStatus: auth.updateTrainerApplicationStatus,
+      getRecruiterApplications: auth.getRecruiterApplications,
+      getRecruiterApplication: auth.getRecruiterApplication,
+      updateRecruiterApplication: auth.updateRecruiterApplication,
+      updateRecruiterApplicationStatus: auth.updateRecruiterApplicationStatus,
       ENROLLMENT_STATUS_LABELS: auth.ENROLLMENT_STATUS_LABELS,
+      TRAINER_APPLICATION_STATUS_LABELS: auth.TRAINER_APPLICATION_STATUS_LABELS,
+      RECRUITER_APPLICATION_STATUS_LABELS: auth.RECRUITER_APPLICATION_STATUS_LABELS,
     }),
-    [user, loading, login, logout, registerLearner, registerTrainer, registerRecruiter, enrollLearner, dashboardPath],
+    [user, loading, login, logout, registerLearner, registerTrainer, enrollLearner, enrollTrainer, enrollRecruiter, dashboardPath],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

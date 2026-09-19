@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, ChevronDown, User, LayoutDashboard, GraduationCap } from 'lucide-react'
+import { LogOut, ChevronDown, User, LayoutDashboard, GraduationCap, Presentation, Briefcase } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
 import { ROLE_LABELS, ROLE_DASHBOARDS } from '../../auth/permission'
 
@@ -15,6 +15,10 @@ export default function AccountMenu({ align = 'right' }) {
   const initial = (user?.name || 'U').slice(0, 1).toUpperCase()
   const roleLabel = ROLE_LABELS[user?.role] || 'Member'
   const isLearner = user?.role === 'learner'
+  const isTrainer = user?.role === 'trainer'
+  const isRecruiter = user?.role === 'recruiter'
+  // Learners + trainers + recruiters have no dashboard — their menu routes to Profile.
+  const isApplicant = isLearner || isTrainer || isRecruiter
 
   // Close when clicking outside.
   useEffect(() => {
@@ -39,7 +43,7 @@ export default function AccountMenu({ align = 'right' }) {
 
   const goPrimary = () => {
     setOpen(false)
-    if (isLearner) {
+    if (isApplicant) {
       navigate('/profile')
       return
     }
@@ -79,7 +83,7 @@ export default function AccountMenu({ align = 'right' }) {
           </div>
 
           <div className="pt-1.5">
-            {isLearner ? (
+            {isApplicant ? (
               <>
                 <button
                   type="button"
@@ -95,7 +99,14 @@ export default function AccountMenu({ align = 'right' }) {
                   onClick={() => go('/profile')}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
                 >
-                  <GraduationCap size={15} className="shrink-0" aria-hidden="true" /> My Enrollment
+                  {isTrainer ? (
+                    <Presentation size={15} className="shrink-0" aria-hidden="true" />
+                  ) : isRecruiter ? (
+                    <Briefcase size={15} className="shrink-0" aria-hidden="true" />
+                  ) : (
+                    <GraduationCap size={15} className="shrink-0" aria-hidden="true" />
+                  )}{' '}
+                  {isTrainer ? 'My Trainer Application' : isRecruiter ? 'My Recruiter Application' : 'My Enrollment'}
                 </button>
               </>
             ) : (

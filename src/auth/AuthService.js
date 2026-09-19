@@ -11,13 +11,18 @@
 // contained to this one layer.
 // ============================================================================
 
+// Reused for optional URL validation in the recruiter application service.
+// Explicit extension so the mock service also loads under plain Node ESM
+// (used by offline test harnesses).
+import { isUrl } from './validation.js'
+
 const STORAGE_KEY = 'thulix_session'
 
 // ---------------------------------------------------------------------------
 // Development / test users. Marked clearly as mock data.
 //   learner  -> active (no approval needed)
-//   trainer  -> pending (requires admin approval)
-//   recruiter-> pending (requires admin approval)
+//   trainer  -> active (has a trainer APPLICATION with its own lifecycle)
+//   recruiter-> active (has a recruiter APPLICATION with its own lifecycle)
 //   admin    -> active (internal/testing only)
 // ---------------------------------------------------------------------------
 const DEV_USERS = [
@@ -30,15 +35,20 @@ const DEV_USERS = [
   },
   {
     id: 'dev-trainer', name: 'Dev Trainer', email: 'trainer@thulix.app',
-    password: 'password123', role: 'trainer', status: 'pending',
-    professionalTitle: 'Senior Full-Stack Engineer', expertise: 'Web Development', experience: '6–10 years',
-    createdAt: '2026-08-10T10:30:00.000Z',
+    password: 'password123', role: 'trainer', status: 'active',
+    phone: '+91 90000 00001', courseOffered: 'Full Stack Development', otherCourse: '',
+    knownSkills: ['JavaScript', 'React', 'Node.js'], experience: '5–10 Years', salaryExpectation: 85000,
+    applicationStatus: 'new', applicationId: 'TRN-2026-DEVT1',
+    createdAt: '2026-08-10T10:30:00.000Z', updatedAt: '2026-08-10T10:30:00.000Z',
   },
   {
     id: 'dev-recruiter', name: 'Dev Recruiter', email: 'recruiter@thulix.app',
-    password: 'password123', role: 'recruiter', status: 'pending',
-    companyName: 'Acme Recruiting Co.', industry: 'Technology', companyLocation: 'Bengaluru, India',
-    createdAt: '2026-08-12T14:45:00.000Z',
+    password: 'password123', role: 'recruiter', status: 'active',
+    phone: '+91 90000 00002', jobTitle: 'Talent Acquisition Lead',
+    companyName: 'Acme Recruiting Co.', companyEmail: 'hire@acme.com', website: 'https://acme.com',
+    companyLocation: 'Bengaluru, India',
+    applicationStatus: 'new', applicationId: 'REC-2026-DEVR1',
+    createdAt: '2026-08-12T14:45:00.000Z', updatedAt: '2026-08-12T14:45:00.000Z',
   },
   {
     id: 'dev-admin', name: 'Dev Admin', email: 'admin@thulix.app',
@@ -65,7 +75,14 @@ function writeStore(users) {
 function seedDevUsers() {
   const users = readStore()
   for (const dev of DEV_USERS) {
-    if (!users.some((u) => u.email === dev.email)) users.push({ ...dev })
+    const idx = users.findIndex((u) => u.email === dev.email)
+    if (idx === -1) {
+      users.push({ ...dev })
+    } else if ((dev.role === 'trainer' || dev.role === 'recruiter') && !users[idx].applicationStatus) {
+      // Migrate legacy stored dev-trainer / dev-recruiter records (old pending
+      // approval shape) to the new application model.
+      users[idx] = { ...users[idx], ...dev }
+    }
   }
   writeStore(users)
 }
@@ -176,11 +193,6 @@ export async function registerTrainer(data) {
   return createUser({ ...data, role: 'trainer', status: 'pending' })
 }
 
-export async function registerRecruiter(data) {
-  await delay(700)
-  return createUser({ ...data, role: 'recruiter', status: 'pending' })
-}
-
 // ---------------------------------------------------------------------------
 // LEARNER ENROLLMENT (course enquiry) — DEVELOPMENT / MOCK
 // A learner enrolment creates an account AND an enquiry record. Learners do
@@ -274,8 +286,9 @@ export async function updateEnrollmentStatus(id, enrollmentStatus) {
   return sanitizeEnrollment(users[idx])
 }
 
-// Learner edits their OWN enquiry from the profile. Locked once the admin has
-// started acting on it (status leaves `new`). Preserves enquiryId + createdAt.
+// Learner edits their OWN enquiry from the profile. Always available; system
+// fields (enquiryId, createdAt, enrollmentStatus) are never touched here — the
+// admin owns the lifecycle status.
 export async function updateLearnerEnrollment(id, patch = {}) {
   await delay(300)
   const name = String(patch.name || '').trim()
@@ -289,9 +302,6 @@ export async function updateLearnerEnrollment(id, patch = {}) {
   const users = reconcileStore()
   const idx = users.findIndex((u) => u.id === id && u.role === 'learner')
   if (idx === -1) throw new Error('Enrollment not found.')
-  if (users[idx].enrollmentStatus !== 'new') {
-    throw new Error('This enquiry is already being handled. Contact our admissions team to make changes.')
-  }
   users[idx].name = name
   users[idx].phone = phone
   users[idx].departmentOrDegree = degree
@@ -301,6 +311,289 @@ export async function updateLearnerEnrollment(id, patch = {}) {
   users[idx].updatedAt = new Date().toISOString()
   writeStore(users)
   return sanitizeEnrollment(users[idx])
+}
+
+// ---------------------------------------------------------------------------
+// TRAINER APPLICATION (become-a-trainer enquiry) — DEVELOPMENT / MOCK
+// A trainer application creates an account AND an application record. Trainers
+// do NOT go through the trainer/recruiter approval workflow; the application
+// has its own lifecycle:
+//   new → reviewed → accepted / not_accepted → closed
+// Replace with API calls when a real backend exists.
+// ---------------------------------------------------------------------------
+
+export const TRAINER_APPLICATION_STATUSES = ['new', 'reviewed', 'accepted', 'not_accepted', 'closed']
+
+export const TRAINER_APPLICATION_STATUS_LABELS = {
+  new: 'New',
+  reviewed: 'Reviewed',
+  accepted: 'Accepted',
+  not_accepted: 'Not Accepted',
+  closed: 'Closed',
+}
+
+let applicationSeq = 0
+// Human-readable trainer application reference, e.g. TRN-2026-A1B2C3.
+function nextApplicationId() {
+  applicationSeq += 1
+  const year = new Date().getFullYear()
+  const frag = (Date.now().toString(36) + applicationSeq + Math.random().toString(36).slice(2, 7)).slice(-6).toUpperCase()
+  return `TRN-${year}-${frag}`
+}
+
+// Display-safe reference: real applicationId, or a stable fallback derived from
+// the record so older stored trainers still show one.
+function displayApplicationId(u) {
+  if (u && u.applicationId) return u.applicationId
+  const year = new Date(u?.createdAt || Date.now()).getFullYear()
+  const tail = String(u?.id || '').replace('usr_', '').slice(0, 6).toUpperCase()
+  return `TRN-${year}-${tail || 'APP'}`
+}
+
+// Known skills may arrive as an array (chip input) or a comma-separated string.
+// Trimmed, de-duplicated (case-insensitive, first occurrence wins), no blanks.
+function normalizeSkills(value) {
+  const list = Array.isArray(value) ? value : String(value || '').split(',')
+  const seen = new Set()
+  const out = []
+  for (const raw of list) {
+    const s = String(raw).trim()
+    if (!s) continue
+    const key = s.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(s)
+  }
+  return out
+}
+
+// Salary is stored as a clean number (never a formatted "₹50,000" string).
+function toAmount(value) {
+  const digits = String(value ?? '').replace(/[^0-9]/g, '')
+  return digits ? Number(digits) : 0
+}
+
+// Creates the trainer account + application record. Throws on duplicate email.
+// Returns { user } (session-safe) and { application } (profile/admin-safe).
+export async function createTrainerApplication(data) {
+  await delay(700)
+  const users = readStore()
+  const email = String(data.email || '').trim().toLowerCase()
+  if (users.some((u) => String(u.email || '').trim().toLowerCase() === email)) {
+    throw new Error('An account with this email already exists.')
+  }
+  const now = new Date().toISOString()
+  const record = {
+    name: String(data.name || '').trim(),
+    email: String(data.email || '').trim(),
+    phone: String(data.phone || '').trim(),
+    courseOffered: data.courseOffered || '',
+    otherCourse: data.otherCourse || '',
+    knownSkills: normalizeSkills(data.knownSkills),
+    experience: data.experience || '',
+    salaryExpectation: toAmount(data.salaryExpectation),
+    password: data.password,
+    role: 'trainer',
+    status: 'active',
+    applicationStatus: 'new',
+    applicationId: nextApplicationId(),
+    id: uniqueId(),
+    createdAt: now,
+    updatedAt: now,
+  }
+  users.push(record)
+  writeStore(users)
+  return { user: sanitize(record), application: sanitizeTrainerApplication(record) }
+}
+
+// Admin-facing list of trainer applications (never includes passwords).
+export function getTrainerApplications() {
+  return getAllUsers().filter((u) => u.role === 'trainer' && u.status === 'active')
+}
+
+// A trainer's own application by user id (used by the profile view).
+export function getTrainerApplication(id) {
+  const all = [...readStore(), ...DEV_USERS]
+  const u = all.find((x) => x.id === id && x.role === 'trainer')
+  return sanitizeTrainerApplication(u || null)
+}
+
+// Admin updates an application's lifecycle status. Persisted to the store.
+export async function updateTrainerApplicationStatus(id, applicationStatus) {
+  await delay(300)
+  if (!TRAINER_APPLICATION_STATUSES.includes(applicationStatus)) {
+    throw new Error('Invalid application status.')
+  }
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'trainer')
+  if (idx === -1) throw new Error('Trainer application not found.')
+  users[idx].applicationStatus = applicationStatus
+  users[idx].updatedAt = new Date().toISOString()
+  writeStore(users)
+  return sanitizeTrainerApplication(users[idx])
+}
+
+// Trainer edits their OWN application from the profile. Always available; system
+// fields (applicationId, createdAt, applicationStatus) are never touched here —
+// the admin owns the lifecycle status.
+export async function updateTrainerApplication(id, patch = {}) {
+  await delay(300)
+  const name = String(patch.name || '').trim()
+  const phone = String(patch.phone || '').trim()
+  const courseOffered = String(patch.courseOffered || '').trim()
+  const experience = String(patch.experience || '').trim()
+  const knownSkills = normalizeSkills(patch.knownSkills)
+  const salaryExpectation = toAmount(patch.salaryExpectation)
+  if (!name) throw new Error('Please enter your full name.')
+  if (!phone) throw new Error('Please enter your phone number.')
+  if (!courseOffered) throw new Error('Please choose a course you can offer.')
+  if (!experience) throw new Error('Please choose your experience level.')
+  if (!knownSkills.length) throw new Error('Please add at least one skill.')
+  if (!salaryExpectation) throw new Error('Please enter your salary expectation.')
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'trainer')
+  if (idx === -1) throw new Error('Trainer application not found.')
+  users[idx].name = name
+  users[idx].phone = phone
+  users[idx].courseOffered = courseOffered
+  users[idx].otherCourse = String(patch.otherCourse || '').trim()
+  users[idx].knownSkills = knownSkills
+  users[idx].experience = experience
+  users[idx].salaryExpectation = salaryExpectation
+  users[idx].updatedAt = new Date().toISOString()
+  writeStore(users)
+  return sanitizeTrainerApplication(users[idx])
+}
+
+// ---------------------------------------------------------------------------
+// RECRUITER APPLICATION (become-a-hiring-partner) — DEVELOPMENT / MOCK
+// A recruiter application creates an account AND an application record.
+// Recruiters do NOT wait for account approval — the application has its own
+// lifecycle (new → reviewed → accepted / not_accepted → closed) and the
+// account is created usable (status active) on submission.
+// Replace with API calls when a real backend exists.
+// ---------------------------------------------------------------------------
+
+export const RECRUITER_APPLICATION_STATUSES = ['new', 'reviewed', 'accepted', 'not_accepted', 'closed']
+
+export const RECRUITER_APPLICATION_STATUS_LABELS = {
+  new: 'New',
+  reviewed: 'Reviewed',
+  accepted: 'Accepted',
+  not_accepted: 'Not Accepted',
+  closed: 'Closed',
+}
+
+let recruiterSeq = 0
+// Human-readable recruiter application reference, e.g. REC-2026-A1B2C3.
+function nextRecruiterId() {
+  recruiterSeq += 1
+  const year = new Date().getFullYear()
+  const frag = (Date.now().toString(36) + recruiterSeq + Math.random().toString(36).slice(2, 7)).slice(-6).toUpperCase()
+  return `REC-${year}-${frag}`
+}
+
+// Display-safe reference: real applicationId, or a stable fallback derived from
+// the record so older stored recruiters still show one.
+function displayRecruiterApplicationId(u) {
+  if (u && u.applicationId) return u.applicationId
+  const year = new Date(u?.createdAt || Date.now()).getFullYear()
+  const tail = String(u?.id || '').replace('usr_', '').slice(0, 6).toUpperCase()
+  return `REC-${year}-${tail || 'APP'}`
+}
+
+// Creates the recruiter account + application record. Throws on duplicate
+// email. Returns { user } (session-safe) and { application } (profile/admin-safe).
+export async function createRecruiterApplication(data) {
+  await delay(700)
+  const users = readStore()
+  const email = String(data.email || '').trim().toLowerCase()
+  if (users.some((u) => String(u.email || '').trim().toLowerCase() === email)) {
+    throw new Error('An account with this email already exists.')
+  }
+  const now = new Date().toISOString()
+  const record = {
+    name: String(data.name || '').trim(),
+    email: String(data.email || '').trim(),
+    phone: String(data.phone || '').trim(),
+    jobTitle: String(data.jobTitle || '').trim(),
+    companyName: String(data.companyName || '').trim(),
+    companyEmail: String(data.companyEmail || '').trim(),
+    website: String(data.website || '').trim(),
+    companyLocation: String(data.companyLocation || '').trim(),
+    password: data.password,
+    role: 'recruiter',
+    status: 'active',
+    applicationStatus: 'new',
+    applicationId: nextRecruiterId(),
+    id: uniqueId(),
+    createdAt: now,
+    updatedAt: now,
+  }
+  users.push(record)
+  writeStore(users)
+  return { user: sanitize(record), application: sanitizeRecruiterApplication(record) }
+}
+
+// Admin-facing list of recruiter applications (never includes passwords).
+export function getRecruiterApplications() {
+  return getAllUsers().filter((u) => u.role === 'recruiter' && u.status === 'active')
+}
+
+// A recruiter's own application by user id (used by the profile view).
+export function getRecruiterApplication(id) {
+  const all = [...readStore(), ...DEV_USERS]
+  const u = all.find((x) => x.id === id && x.role === 'recruiter')
+  return sanitizeRecruiterApplication(u || null)
+}
+
+// Admin updates an application's lifecycle status. Persisted to the store.
+export async function updateRecruiterApplicationStatus(id, applicationStatus) {
+  await delay(300)
+  if (!RECRUITER_APPLICATION_STATUSES.includes(applicationStatus)) {
+    throw new Error('Invalid application status.')
+  }
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'recruiter')
+  if (idx === -1) throw new Error('Recruiter application not found.')
+  users[idx].applicationStatus = applicationStatus
+  users[idx].updatedAt = new Date().toISOString()
+  writeStore(users)
+  return sanitizeRecruiterApplication(users[idx])
+}
+
+// Recruiter edits their OWN application from the profile. Always available;
+// system fields (applicationId, email, createdAt, applicationStatus) are never
+// touched here — the admin owns the lifecycle status.
+export async function updateRecruiterApplication(id, patch = {}) {
+  await delay(300)
+  const name = String(patch.name || '').trim()
+  const phone = String(patch.phone || '').trim()
+  const jobTitle = String(patch.jobTitle || '').trim()
+  const companyName = String(patch.companyName || '').trim()
+  const companyEmail = String(patch.companyEmail || '').trim()
+  const website = String(patch.website || '').trim()
+  const companyLocation = String(patch.companyLocation || '').trim()
+  if (!name) throw new Error('Please enter your full name.')
+  if (!phone) throw new Error('Please enter your phone number.')
+  if (!jobTitle) throw new Error('Please enter your job title.')
+  if (!companyName) throw new Error('Please enter your company name.')
+  if (!companyEmail) throw new Error('Please enter your company email / domain.')
+  if (website && !isUrl(website)) throw new Error('Please enter a valid website URL.')
+  if (!companyLocation) throw new Error('Please enter your company location.')
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'recruiter')
+  if (idx === -1) throw new Error('Recruiter application not found.')
+  users[idx].name = name
+  users[idx].phone = phone
+  users[idx].jobTitle = jobTitle
+  users[idx].companyName = companyName
+  users[idx].companyEmail = companyEmail
+  users[idx].website = website
+  users[idx].companyLocation = companyLocation
+  users[idx].updatedAt = new Date().toISOString()
+  writeStore(users)
+  return sanitizeRecruiterApplication(users[idx])
 }
 
 export async function forgotPassword(email) {
@@ -363,9 +656,7 @@ function sanitizeForAdmin(u) {
       expertise: u.expertise || '',
       experience: u.experience || '',
       companyName: u.companyName || '',
-      industry: u.industry || '',
       companyLocation: u.companyLocation || '',
-      companySize: u.companySize || '',
       phone: u.phone || '',
       degree: u.degree || '',
       city: u.city || '',
@@ -378,6 +669,22 @@ function sanitizeForAdmin(u) {
       otherDegree: u.otherDegree || '',
       enrollmentStatus: u.enrollmentStatus || 'new',
       enquiryId: displayEnquiryId(u),
+      updatedAt: u.updatedAt || u.createdAt || '',
+    },
+    application: {
+      courseOffered: u.courseOffered || '',
+      otherCourse: u.otherCourse || '',
+      knownSkills: normalizeSkills(u.knownSkills),
+      experience: u.experience || '',
+      salaryExpectation: toAmount(u.salaryExpectation),
+      jobTitle: u.jobTitle || '',
+      companyName: u.companyName || '',
+      companyEmail: u.companyEmail || '',
+      website: u.website || '',
+      companyLocation: u.companyLocation || '',
+      phone: u.phone || '',
+      applicationStatus: u.applicationStatus || 'new',
+      applicationId: u.role === 'recruiter' ? displayRecruiterApplicationId(u) : displayApplicationId(u),
       updatedAt: u.updatedAt || u.createdAt || '',
     },
   }
@@ -399,6 +706,50 @@ function sanitizeEnrollment(u) {
     otherDegree: u.otherDegree || '',
     enrollmentStatus: u.enrollmentStatus || 'new',
     enquiryId: displayEnquiryId(u),
+    createdAt: u.createdAt || '',
+    updatedAt: u.updatedAt || u.createdAt || '',
+  }
+}
+
+// Sanitized trainer application view (no password / auth internals).
+function sanitizeTrainerApplication(u) {
+  if (!u) return null
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    phone: u.phone || '',
+    courseOffered: u.courseOffered || '',
+    otherCourse: u.otherCourse || '',
+    knownSkills: normalizeSkills(u.knownSkills),
+    experience: u.experience || '',
+    salaryExpectation: toAmount(u.salaryExpectation),
+    applicationStatus: u.applicationStatus || 'new',
+    applicationId: displayApplicationId(u),
+    createdAt: u.createdAt || '',
+    updatedAt: u.updatedAt || u.createdAt || '',
+  }
+}
+
+// Sanitized recruiter application view (no password / auth internals).
+function sanitizeRecruiterApplication(u) {
+  if (!u) return null
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    phone: u.phone || '',
+    jobTitle: u.jobTitle || '',
+    companyName: u.companyName || '',
+    companyEmail: u.companyEmail || '',
+    website: u.website || '',
+    companyLocation: u.companyLocation || '',
+    applicationStatus: u.applicationStatus || 'new',
+    applicationId: displayRecruiterApplicationId(u),
     createdAt: u.createdAt || '',
     updatedAt: u.updatedAt || u.createdAt || '',
   }
