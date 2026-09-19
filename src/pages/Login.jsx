@@ -9,6 +9,7 @@ import OTPInput from '../components/auth/OTPInput'
 import SubmitButton from '../components/auth/SubmitButton'
 import { useAuth } from '../auth/AuthContext'
 import { validateEmail } from '../auth/validation'
+import { ROLE_DASHBOARDS } from '../auth/permission'
 import * as auth from '../auth/AuthService'
 import { EASE } from '../lib/animations'
 
@@ -58,7 +59,7 @@ export default function Login() {
     setApiError('')
     try {
       const u = await login({ email, password, remember })
-      if (u?.role) navigate(`/${u.role}/dashboard`, { replace: true })
+      if (u?.role) navigate(ROLE_DASHBOARDS[u.role] || '/', { replace: true })
     } catch (err) {
       setApiError(err.message)
     } finally {

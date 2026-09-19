@@ -18,6 +18,7 @@ export default function RegisterSteps({
   finalLabel,          // button text on last step
   onSubmit,            // fn(data) -> called on submit
   submitting = false,
+  apiError = '',       // optional server error banner (e.g. duplicate email)
 }) {
   const [index, setIndex] = useState(0)
   const [errors, setErrors] = useState({})
@@ -101,6 +102,15 @@ export default function RegisterSteps({
                 </ul>
               </div>
             </div>
+          )}
+
+          {apiError && (
+            <p
+              role="alert"
+              className="mt-5 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-xs text-error"
+            >
+              {apiError}
+            </p>
           )}
 
           <div className="mt-7 flex items-center gap-3">

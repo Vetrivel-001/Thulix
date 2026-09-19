@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { canAccessRoute, isReviewRole, roleFromPath } from '../auth/permission'
+import { canAccessRoute, isReviewRole, roleFromPath, ROLE_DASHBOARDS } from '../auth/permission'
 
 // Full-screen loading matched to the app aesthetic.
 function RouteLoader() {
@@ -55,11 +55,11 @@ export function RoleGuard({ role, children }) {
   return children
 }
 
-// Redirects to the correct dashboard once authenticated, keeps anonymous
-// users on the page (e.g. login already redirects).
+// Redirects to the correct destination once authenticated (for learners that is
+// the home page, not a dashboard). Keeps anonymous users on the current page.
 export function RequireLoggedIn({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <RouteLoader />
-  if (user) return <Navigate to={`/${user.role}/dashboard`} replace />
+  if (user) return <Navigate to={ROLE_DASHBOARDS[user.role] || '/'} replace />
   return children
 }

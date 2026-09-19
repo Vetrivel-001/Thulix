@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Activity, AlertTriangle, ArrowRight, Bell, Check, Clock, LayoutDashboard,
+  Activity, AlertTriangle, ArrowRight, Bell, Check, Clock, GraduationCap, LayoutDashboard,
   Mail, RefreshCw, Search, ShieldCheck, Trash2, Undo2, UserCheck, UserX, Users, X,
 } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import { isRejectedApplication } from '../auth/AuthService'
+import { isRejectedApplication, ENROLLMENT_STATUS_LABELS } from '../auth/AuthService'
 import { ROLE_LABELS } from '../auth/permission'
 import AccountMenu from '../components/auth/AccountMenu'
 
 const TINT = '#F59E0B'
 const ROLE_TINTS = { learner: '#8B5CF6', trainer: '#06B6D4', recruiter: '#10B981', admin: '#F59E0B' }
+const ENROLLMENT_TINTS = { new: '#F59E0B', contacted: '#06B6D4', in_progress: '#8B5CF6', enrolled: '#10B981', closed: '#94A3B8' }
 
 const STATUS_STYLE = {
   active: { label: 'Active', color: '#10B981' },
@@ -40,10 +41,11 @@ function StatusBadge({ status }) {
 }
 
 export default function AdminDashboard() {
-  const { user, getAllUsers, getPendingApplications, getRejectedApplications, getStats, setUserStatus, deleteUser } = useAuth()
+  const { user, getAllUsers, getPendingApplications, getRejectedApplications, getStats, setUserStatus, deleteUser, getLearnerEnrollments, updateEnrollmentStatus } = useAuth()
   const [users, setUsers] = useState([])
   const [apps, setApps] = useState([])
   const [rejectedApps, setRejectedApps] = useState([])
+  const [enrollments, setEnrollments] = useState([])
   const [stats, setStats] = useState(null)
   const [busy, setBusy] = useState({})
   const [notice, setNotice] = useState(null)
@@ -52,13 +54,15 @@ export default function AdminDashboard() {
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [enrFilter, setEnrFilter] = useState('all')
 
   const reload = useCallback(() => {
     setUsers(getAllUsers())
     setApps(getPendingApplications())
     setRejectedApps(getRejectedApplications())
+    setEnrollments(getLearnerEnrollments())
     setStats(getStats())
-  }, [getAllUsers, getPendingApplications, getRejectedApplications, getStats])
+  }, [getAllUsers, getPendingApplications, getRejectedApplications, getLearnerEnrollments, getStats])
 
   useEffect(() => {
     reload()
@@ -96,6 +100,20 @@ export default function AdminDashboard() {
     }
   }
 
+  const changeEnrollmentStatus = async (id, status) => {
+    const entry = enrollments.find((x) => x.id === id)
+    setBusy((b) => ({ ...b, [`enr_${id}`]: status }))
+    try {
+      await updateEnrollmentStatus(id, status)
+      reload()
+      flash(`${entry?.name || 'Learner'} enquiry marked ${ENROLLMENT_STATUS_LABELS[status] || status}.`)
+    } catch (e) {
+      flash(e.message || 'Something went wrong.', false)
+    } finally {
+      setBusy((b) => ({ ...b, [`enr_${id}`]: undefined }))
+    }
+  }
+
   const removeApp = async (id, name) => {
     setBusy((b) => ({ ...b, [id]: 'removing' }))
     try {
@@ -125,6 +143,11 @@ export default function AdminDashboard() {
       )
     })
   }, [users, query, roleFilter, statusFilter])
+
+  const displayedEnrollments = useMemo(() => {
+    if (enrFilter === 'all') return enrollments
+    return enrollments.filter((e) => (e.enrollment?.enrollmentStatus || 'new') === enrFilter)
+  }, [enrollments, enrFilter])
 
   if (!stats) {
     return (
@@ -384,6 +407,115 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+        </section>
+
+        {/* Learner enquiries */}
+        <section aria-label="Learner enquiries" className="mt-10">
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <GraduationCap size={18} className="text-neon" />
+              <h2 className="font-heading text-xl font-bold text-snow">Learner Enquiries</h2>
+              <span className="rounded-full bg-neon/15 px-2.5 py-0.5 text-xs font-semibold text-neon">{displayedEnrollments.length}</span>
+            </div>
+            <div className="ml-auto flex flex-wrap gap-2">
+              <select
+                value={enrFilter}
+                onChange={(e) => setEnrFilter(e.target.value)}
+                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-neon/50"
+                aria-label="Filter enquiries by status"
+              >
+                <option value="all">All statuses</option>
+                {Object.entries(ENROLLMENT_STATUS_LABELS).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {enrollments.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
+              <ShieldCheck size={18} className="text-success" /> No learner enquiries yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-2xl border border-[rgba(139,92,246,0.22)] bg-abyss-2/40">
+              <table className="w-full min-w-[880px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
+                    <th className="px-5 py-3 font-semibold">Enquiry ID</th>
+                    <th className="px-5 py-3 font-semibold">Learner</th>
+                    <th className="px-5 py-3 font-semibold">Phone</th>
+                    <th className="px-5 py-3 font-semibold">Department / Degree</th>
+                    <th className="px-5 py-3 font-semibold">Needed Course</th>
+                    <th className="px-5 py-3 font-semibold">Status</th>
+                    <th className="px-5 py-3 font-semibold">Submitted</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
+                  {displayedEnrollments.map((e) => {
+                    const current = e.enrollment?.enrollmentStatus || 'new'
+                    return (
+                      <tr key={e.id} className="align-middle">
+                        <td className="px-5 py-3.5">
+                          <span className="rounded-lg bg-neon/10 px-2 py-1 font-mono text-xs font-semibold text-neon">
+                            {e.enrollment?.enquiryId || '—'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white"
+                              style={{ background: `${ROLE_TINTS.learner}33`, color: ROLE_TINTS.learner }}
+                            >
+                              {(e.name || 'U').slice(0, 1).toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-snow">{e.name}</p>
+                              <p className="truncate text-xs text-mist">{e.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{e.enrollment?.phone || '—'}</td>
+                        <td className="max-w-[180px] truncate px-5 py-3.5 text-mist">{e.enrollment?.departmentOrDegree || '—'}</td>
+                        <td className="max-w-[180px] truncate px-5 py-3.5 text-snow">{e.enrollment?.neededCourse || '—'}</td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col items-start gap-1.5">
+                            <span
+                              className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                              style={{
+                                background: `${ENROLLMENT_TINTS[current] || '#F59E0B'}1a`,
+                                color: ENROLLMENT_TINTS[current] || '#F59E0B',
+                              }}
+                            >
+                              {ENROLLMENT_STATUS_LABELS[current] || current}
+                            </span>
+                            <select
+                              value={current}
+                              disabled={!!busy[`enr_${e.id}`]}
+                              onChange={(ev) => changeEnrollmentStatus(e.id, ev.target.value)}
+                              aria-label={`Enrollment status for ${e.name}`}
+                              className="rounded-lg border border-[rgba(148,163,184,0.18)] bg-abyss-2/70 px-2 py-1 text-xs text-snow outline-none transition-colors focus:border-neon/60 disabled:opacity-50"
+                            >
+                              {Object.entries(ENROLLMENT_STATUS_LABELS).map(([key, label]) => (
+                                <option key={key} value={key}>{label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">
+                          {e.createdAt ? new Date(e.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {displayedEnrollments.length === 0 && (
+                <div className="flex items-center gap-3 p-6 text-sm text-mist">
+                  <AlertTriangle size={18} className="text-golden" /> No enquiries match this status.
+                </div>
+              )}
             </div>
           )}
         </section>

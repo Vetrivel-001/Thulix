@@ -22,6 +22,7 @@ import ResetPassword from './pages/ResetPassword'
 import VerifyPage from './pages/VerifyPage'
 import ApprovalStatusPage from './pages/ApprovalStatusPage'
 import Unauthorized from './pages/Unauthorized'
+import ProfilePage from './pages/ProfilePage'
 import AdminDashboard from './pages/AdminDashboard'
 import DashboardPlaceholder from './components/auth/DashboardPlaceholder'
 import { ProtectedRoute, RoleGuard, RequireLoggedIn } from './auth/guards'
@@ -141,15 +142,17 @@ export default function App() {
             <Route path="/recruiter/pending" element={<ProtectedRoute><ApprovalStatusPage variant="pending" role="recruiter" /></ProtectedRoute>} />
             <Route path="/recruiter/rejected" element={<ProtectedRoute><ApprovalStatusPage variant="rejected" role="recruiter" /></ProtectedRoute>} />
 
-            {/* Role dashboards */}
+            {/* Learner profile (learners have no dashboard — enrollments only) */}
             <Route
-              path="/learner/dashboard"
+              path="/profile"
               element={
-                <RoleGuard role="learner">
-                  <DashboardPlaceholder />
-                </RoleGuard>
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
               }
             />
+
+            {/* Role dashboards */}
             <Route
               path="/trainer/dashboard"
               element={

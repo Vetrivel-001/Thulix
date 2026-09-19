@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, ChevronDown, User, LayoutDashboard } from 'lucide-react'
+import { LogOut, ChevronDown, User, LayoutDashboard, GraduationCap } from 'lucide-react'
 import { useAuth } from '../../auth/AuthContext'
-import { ROLE_LABELS } from '../../auth/permission'
+import { ROLE_LABELS, ROLE_DASHBOARDS } from '../../auth/permission'
 
 // Compact avatar + dropdown with user info and a working Sign Out.
-// Works on dashboards and the marketing Navbar.
+// Learners have no dashboard — their menu routes to Profile / Enrollment.
 export default function AccountMenu({ align = 'right' }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
@@ -14,6 +14,7 @@ export default function AccountMenu({ align = 'right' }) {
 
   const initial = (user?.name || 'U').slice(0, 1).toUpperCase()
   const roleLabel = ROLE_LABELS[user?.role] || 'Member'
+  const isLearner = user?.role === 'learner'
 
   // Close when clicking outside.
   useEffect(() => {
@@ -31,9 +32,18 @@ export default function AccountMenu({ align = 'right' }) {
     navigate('/login', { replace: true })
   }
 
-  const goDashboard = () => {
+  const go = (path) => {
     setOpen(false)
-    navigate(`/${user?.role}/dashboard`)
+    navigate(path)
+  }
+
+  const goPrimary = () => {
+    setOpen(false)
+    if (isLearner) {
+      navigate('/profile')
+      return
+    }
+    navigate(ROLE_DASHBOARDS[user?.role] || '/')
   }
 
   return (
@@ -69,22 +79,45 @@ export default function AccountMenu({ align = 'right' }) {
           </div>
 
           <div className="pt-1.5">
-            <button
-              type="button"
-              role="menuitem"
-              onClick={goDashboard}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
-            >
-              <LayoutDashboard size={15} className="shrink-0" aria-hidden="true" /> My Dashboard
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
-            >
-              <User size={15} className="shrink-0" aria-hidden="true" /> Profile
-            </button>
+            {isLearner ? (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => go('/profile')}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
+                >
+                  <User size={15} className="shrink-0" aria-hidden="true" /> My Profile
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => go('/profile')}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
+                >
+                  <GraduationCap size={15} className="shrink-0" aria-hidden="true" /> My Enrollment
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={goPrimary}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
+                >
+                  <LayoutDashboard size={15} className="shrink-0" aria-hidden="true" /> My Dashboard
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => go('/profile')}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-mist transition-colors hover:bg-abyss-3/60 hover:text-snow"
+                >
+                  <User size={15} className="shrink-0" aria-hidden="true" /> Profile
+                </button>
+              </>
+            )}
           </div>
 
           <div className="pt-1.5">

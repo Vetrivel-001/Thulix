@@ -24,7 +24,9 @@ const DEV_USERS = [
   {
     id: 'dev-learner', name: 'Dev Learner', email: 'learner@thulix.app',
     password: 'password123', role: 'learner', status: 'active',
-    createdAt: '2026-08-01T09:15:00.000Z',
+    phone: '+91 90000 00000', departmentOrDegree: 'BCA', neededCourse: 'Full Stack Development',
+    enrollmentStatus: 'new', enquiryId: 'THX-2026-DEVL1',
+    createdAt: '2026-08-01T09:15:00.000Z', updatedAt: '2026-08-01T09:15:00.000Z',
   },
   {
     id: 'dev-trainer', name: 'Dev Trainer', email: 'trainer@thulix.app',
@@ -108,7 +110,13 @@ const delay = (ms = 500) => new Promise((res) => setTimeout(res, ms))
 export async function loginWithEmail({ email, password }) {
   await delay(700)
   const user = findUserByEmail(email)
-  if (user && user.password === password) return sanitize(user)
+  if (user && user.password === password) {
+    // Deactivated learners are barred from sign-in (they have no dashboard guard).
+    if (user.role === 'learner' && user.status === 'rejected') {
+      throw new Error('Your account has been deactivated. Please contact support.')
+    }
+    return sanitize(user)
+  }
   throw new Error('Invalid email or password.')
 }
 
@@ -171,6 +179,128 @@ export async function registerTrainer(data) {
 export async function registerRecruiter(data) {
   await delay(700)
   return createUser({ ...data, role: 'recruiter', status: 'pending' })
+}
+
+// ---------------------------------------------------------------------------
+// LEARNER ENROLLMENT (course enquiry) — DEVELOPMENT / MOCK
+// A learner enrolment creates an account AND an enquiry record. Learners do
+// NOT go through the trainer/recruiter approval workflow; the enquiry has its
+// own lifecycle (new → contacted → in_progress → enrolled → closed).
+// Replace with API calls when a real backend exists.
+// ---------------------------------------------------------------------------
+
+export const ENROLLMENT_STATUSES = ['new', 'contacted', 'in_progress', 'enrolled', 'closed']
+
+export const ENROLLMENT_STATUS_LABELS = {
+  new: 'New',
+  contacted: 'Contacted',
+  in_progress: 'In Progress',
+  enrolled: 'Enrolled',
+  closed: 'Closed',
+}
+
+let enquirySeq = 0
+// Human-readable application / enquiry reference, e.g. THX-2026-A1B2C3.
+function nextEnquiryId() {
+  enquirySeq += 1
+  const year = new Date().getFullYear()
+  const frag = (Date.now().toString(36) + enquirySeq + Math.random().toString(36).slice(2, 7)).slice(-6).toUpperCase()
+  return `THX-${year}-${frag}`
+}
+
+// Display-safe reference: real enquiryId, or a stable fallback derived from the
+// record so older stored learners (without an enquiryId) still show one.
+function displayEnquiryId(u) {
+  if (u && u.enquiryId) return u.enquiryId
+  const year = new Date(u?.createdAt || Date.now()).getFullYear()
+  const tail = String(u?.id || '').replace('usr_', '').slice(0, 6).toUpperCase()
+  return `THX-${year}-${tail || 'ENQ'}`
+}
+
+// Creates the learner account + enrollment record. Throws on duplicate email.
+// Returns { user } (session-safe) and { enrollment } (profile/admin-safe).
+export async function createLearnerEnrollment(data) {
+  await delay(700)
+  const users = readStore()
+  const email = String(data.email || '').trim().toLowerCase()
+  if (users.some((u) => String(u.email || '').trim().toLowerCase() === email)) {
+    throw new Error('An account with this email already exists.')
+  }
+  const now = new Date().toISOString()
+  const record = {
+    name: String(data.name || '').trim(),
+    email: String(data.email || '').trim(),
+    phone: String(data.phone || '').trim(),
+    departmentOrDegree: data.departmentOrDegree || '',
+    neededCourse: data.neededCourse || '',
+    otherCourse: data.otherCourse || '',
+    otherDegree: data.otherDegree || '',
+    password: data.password,
+    role: 'learner',
+    status: 'active',
+    enrollmentStatus: 'new',
+    enquiryId: nextEnquiryId(),
+    id: uniqueId(),
+    createdAt: now,
+    updatedAt: now,
+  }
+  users.push(record)
+  writeStore(users)
+  return { user: sanitize(record), enrollment: sanitizeEnrollment(record) }
+}
+
+// Admin-facing list of active learner enquiries (never includes passwords).
+export function getLearnerEnrollments() {
+  return getAllUsers().filter((u) => u.role === 'learner' && u.status === 'active')
+}
+
+// A learner's own enrollment by user id (used by the profile view).
+export function getLearnerEnrollment(id) {
+  const all = [...readStore(), ...DEV_USERS]
+  const u = all.find((x) => x.id === id && x.role === 'learner')
+  return sanitizeEnrollment(u || null)
+}
+
+// Admin updates an enquiry's lifecycle status. Persisted to the store.
+export async function updateEnrollmentStatus(id, enrollmentStatus) {
+  await delay(300)
+  if (!ENROLLMENT_STATUSES.includes(enrollmentStatus)) throw new Error('Invalid enrollment status.')
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'learner')
+  if (idx === -1) throw new Error('Enrollment not found.')
+  users[idx].enrollmentStatus = enrollmentStatus
+  users[idx].updatedAt = new Date().toISOString()
+  writeStore(users)
+  return sanitizeEnrollment(users[idx])
+}
+
+// Learner edits their OWN enquiry from the profile. Locked once the admin has
+// started acting on it (status leaves `new`). Preserves enquiryId + createdAt.
+export async function updateLearnerEnrollment(id, patch = {}) {
+  await delay(300)
+  const name = String(patch.name || '').trim()
+  const phone = String(patch.phone || '').trim()
+  const degree = String(patch.departmentOrDegree || '').trim()
+  const course = String(patch.neededCourse || '').trim()
+  if (!name) throw new Error('Please enter your full name.')
+  if (!phone) throw new Error('Please enter your phone number.')
+  if (!degree) throw new Error('Please tell us your department / degree.')
+  if (!course) throw new Error('Please choose an interested course.')
+  const users = reconcileStore()
+  const idx = users.findIndex((u) => u.id === id && u.role === 'learner')
+  if (idx === -1) throw new Error('Enrollment not found.')
+  if (users[idx].enrollmentStatus !== 'new') {
+    throw new Error('This enquiry is already being handled. Contact our admissions team to make changes.')
+  }
+  users[idx].name = name
+  users[idx].phone = phone
+  users[idx].departmentOrDegree = degree
+  users[idx].neededCourse = course
+  users[idx].otherDegree = String(patch.otherDegree || '').trim()
+  users[idx].otherCourse = String(patch.otherCourse || '').trim()
+  users[idx].updatedAt = new Date().toISOString()
+  writeStore(users)
+  return sanitizeEnrollment(users[idx])
 }
 
 export async function forgotPassword(email) {
@@ -241,6 +371,36 @@ function sanitizeForAdmin(u) {
       city: u.city || '',
       jobTitle: u.jobTitle || '',
     },
+    enrollment: {
+      departmentOrDegree: u.departmentOrDegree || u.degree || '',
+      neededCourse: u.neededCourse || '',
+      otherCourse: u.otherCourse || '',
+      otherDegree: u.otherDegree || '',
+      enrollmentStatus: u.enrollmentStatus || 'new',
+      enquiryId: displayEnquiryId(u),
+      updatedAt: u.updatedAt || u.createdAt || '',
+    },
+  }
+}
+
+// Sanitized learner enrollment view (no password / auth internals).
+function sanitizeEnrollment(u) {
+  if (!u) return null
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    phone: u.phone || '',
+    departmentOrDegree: u.departmentOrDegree || u.degree || '',
+    neededCourse: u.neededCourse || '',
+    otherCourse: u.otherCourse || '',
+    otherDegree: u.otherDegree || '',
+    enrollmentStatus: u.enrollmentStatus || 'new',
+    enquiryId: displayEnquiryId(u),
+    createdAt: u.createdAt || '',
+    updatedAt: u.updatedAt || u.createdAt || '',
   }
 }
 

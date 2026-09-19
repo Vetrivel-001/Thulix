@@ -15,9 +15,11 @@ export const ROLE_LABELS = {
   admin: 'Admin',
 }
 
-// Default dashboard route per role (used for post-login redirect).
+// Default destination per role (used for post-login redirect).
+// Learners are enrolled/enquiries — they land on the public home page, where
+// the Navbar account menu exposes their Profile / Enrollment.
 export const ROLE_DASHBOARDS = {
-  learner: '/learner/dashboard',
+  learner: '/',
   trainer: '/trainer/dashboard',
   recruiter: '/recruiter/dashboard',
   admin: '/admin/dashboard',

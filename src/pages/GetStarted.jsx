@@ -10,10 +10,10 @@ const ROLES = [
   {
     key: 'learner',
     title: 'Learner',
-    desc: 'Learn skills, build your career path, get hired.',
+    desc: 'Enroll in your course and start your learning journey.',
     icon: GraduationCap,
     accent: '#8B5CF6',
-    features: ['AI Roadmaps', 'Courses', 'Projects'],
+    features: ['Course Enrollment', 'Career Guidance', 'AI Assistance'],
     to: '/register/learner',
   },
   {

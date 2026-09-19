@@ -38,6 +38,15 @@ export function AuthProvider({ children }) {
   const registerTrainer = useCallback((data) => register(auth.registerTrainer, data), [register])
   const registerRecruiter = useCallback((data) => register(auth.registerRecruiter, data), [register])
 
+  // Learner course-enrollment flow: create account + enquiry, then keep the
+  // learner authenticated (session saved exactly like the other registers).
+  const enrollLearner = useCallback(async (data) => {
+    const result = await auth.createLearnerEnrollment(data)
+    auth.saveSession(result.user)
+    setUser(result.user)
+    return result
+  }, [])
+
   const logout = useCallback(async () => {
     await auth.logout()
     setUser(null)
@@ -56,6 +65,7 @@ export function AuthProvider({ children }) {
       registerLearner,
       registerTrainer,
       registerRecruiter,
+      enrollLearner,
       dashboardPath,
       getAllUsers: auth.getAllUsers,
       getPendingApplications: auth.getPendingApplications,
@@ -63,8 +73,13 @@ export function AuthProvider({ children }) {
       getStats: auth.getStats,
       setUserStatus: auth.setUserStatus,
       deleteUser: auth.deleteUser,
+      getLearnerEnrollments: auth.getLearnerEnrollments,
+      getLearnerEnrollment: auth.getLearnerEnrollment,
+      updateEnrollmentStatus: auth.updateEnrollmentStatus,
+      updateLearnerEnrollment: auth.updateLearnerEnrollment,
+      ENROLLMENT_STATUS_LABELS: auth.ENROLLMENT_STATUS_LABELS,
     }),
-    [user, loading, login, logout, registerLearner, registerTrainer, registerRecruiter, dashboardPath],
+    [user, loading, login, logout, registerLearner, registerTrainer, registerRecruiter, enrollLearner, dashboardPath],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
