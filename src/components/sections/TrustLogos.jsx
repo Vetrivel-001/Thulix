@@ -14,13 +14,19 @@ const logoMap = {
   Accenture: SiAccenture,
 }
 
-function LogoItem({ name }) {
-  const Logo = logoMap[name]
+function LogoItem({ company }) {
+  const Logo = logoMap[company.name]
   return (
-    <div className="flex shrink-0 items-center gap-2.5 text-snow/30 grayscale transition-all duration-300 hover:text-snow/60 hover:grayscale-0">
+    <a
+      href={company.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${company.name} official website`}
+      className="flex shrink-0 items-center gap-2.5 text-snow/30 grayscale transition-all duration-300 hover:text-snow/60 hover:grayscale-0"
+    >
       {Logo ? <Logo size={26} aria-hidden="true" /> : null}
-      <span className="whitespace-nowrap font-heading text-lg font-semibold">{name}</span>
-    </div>
+      <span className="whitespace-nowrap font-heading text-lg font-semibold">{company.name}</span>
+    </a>
   )
 }
 
@@ -36,13 +42,13 @@ export default function TrustLogos() {
       </div>
       <Marquee speed={34}>
         {TRUST_COMPANIES.map((c) => (
-          <LogoItem key={c.name} name={c.name} />
+          <LogoItem key={c.name} company={c} />
         ))}
       </Marquee>
       <div className="mx-auto mt-6 max-w-7xl px-5 lg:px-8">
         <Marquee reverse speed={40}>
           {[...TRUST_COMPANIES].reverse().map((c) => (
-            <LogoItem key={c.name} name={c.name} />
+            <LogoItem key={c.name} company={c} />
           ))}
         </Marquee>
       </div>

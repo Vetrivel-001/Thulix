@@ -118,6 +118,29 @@ function findUserByEmail(email) {
   return all.find((u) => String(u.email || '').trim().toLowerCase() === e) || null
 }
 
+// Compare phone numbers by their digits only, so "+91 90000 00000" and
+// "9000000000" are treated as the same number.
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '')
+}
+
+// Duplicate checks used by the onboarding forms (email / mobile already tied to
+// an existing account). An optional excludeId lets a user keep their OWN email
+// or phone when editing — only *another* account's values are treated as taken.
+export function isEmailTaken(email, excludeId) {
+  const key = String(email || '').trim().toLowerCase()
+  if (!key) return false
+  return [...readStore(), ...DEV_USERS].some(
+    (u) => u.id !== excludeId && String(u.email || '').trim().toLowerCase() === key,
+  )
+}
+
+export function isPhoneTaken(phone, excludeId) {
+  const digits = normalizePhone(phone)
+  if (!digits) return false
+  return [...readStore(), ...DEV_USERS].some((u) => u.id !== excludeId && normalizePhone(u.phone) === digits)
+}
+
 const delay = (ms = 500) => new Promise((res) => setTimeout(res, ms))
 
 // ---------------------------------------------------------------------------
