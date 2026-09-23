@@ -52,6 +52,15 @@ export default function RegisterSteps({
     setIndex((i) => Math.max(i - 1, 0))
   }
 
+  // Jump straight to a step (used by the Review page "Edit" buttons). Existing
+  // values are preserved — `data` is never reset when navigating steps.
+  const goTo = (i) => {
+    if (i < 0 || i >= steps.length) return
+    setAttempted(false)
+    setErrors({})
+    setIndex(i)
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
     setAttempted(true)
@@ -83,7 +92,7 @@ export default function RegisterSteps({
               transition={{ duration: 0.3, ease: EASE }}
               className="space-y-5"
             >
-              {step.form({ data, set, errors })}
+              {step.form({ data, set, errors, goTo })}
             </motion.div>
           </AnimatePresence>
 
