@@ -9,6 +9,7 @@ import StatusScreen from '../components/auth/StatusScreen'
 import SkillsInput from '../components/auth/SkillsInput'
 import { SelectBlock, TermsCheck } from '../components/auth/FormControls'
 import RegisterSteps from '../components/auth/RegisterSteps'
+import ReviewSummary from '../components/auth/ReviewSummary'
 import {
   validateName,
   validateEmail,
@@ -20,12 +21,12 @@ import {
 } from '../auth/validation'
 import { useAuth } from '../auth/AuthContext'
 import { sendTrainerApplicationConfirmation } from '../auth/EmailService'
-import { TRAINER_APPLICATION_STATUS_LABELS } from '../auth/AuthService'
+import { TRAINER_APPLICATION_STATUS_LABELS, isEmailTaken, isPhoneTaken } from '../auth/AuthService'
 import { COURSE_OPTIONS, TRAINER_EXPERIENCE_OPTIONS, SKILL_SUGGESTIONS } from '../lib/catalog'
 import { EASE } from '../lib/animations'
 
 export default function TrainerRegister() {
-  const { enrollTrainer } = useAuth()
+  const { enrollTrainer, user } = useAuth()
   const navigate = useNavigate()
 
   const [submitting, setSubmitting] = useState(false)
@@ -44,8 +45,16 @@ export default function TrainerRegister() {
       label: 'Personal',
       validate: (d) => ({
         name: validateName(d.name),
-        email: validateEmail(d.email),
-        phone: validatePhone(d.phone),
+        email:
+          validateEmail(d.email) ||
+          (isEmailTaken(d.email, user?.id)
+            ? 'This email is already registered. Please use a different email address.'
+            : ''),
+        phone:
+          validatePhone(d.phone) ||
+          (isPhoneTaken(d.phone, user?.id)
+            ? 'This mobile number is already registered. Please use a different mobile number.'
+            : ''),
       }),
       form: ({ data, set, errors }) => (
         <>
@@ -186,6 +195,46 @@ export default function TrainerRegister() {
           </div>
         </>
       ),
+    },
+    {
+      id: 'review',
+      label: 'Review',
+      validate: () => ({}),
+      form: ({ data, goTo }) => {
+        const skills = Array.isArray(data.knownSkills) ? data.knownSkills : []
+        return (
+          <ReviewSummary
+            accent="#06B6D4"
+            goTo={goTo}
+            rows={[
+              { label: 'Full name', value: data.name, edit: 0 },
+              { label: 'Email', value: data.email, edit: 0 },
+              { label: 'Phone', value: data.phone, edit: 0 },
+              { label: 'Course offered', value: data.course === 'Other' ? data.otherCourse : data.course, edit: 1 },
+              {
+                label: 'Known skills',
+                value: skills.length ? (
+                  <span className="flex flex-wrap justify-end gap-1.5">
+                    {skills.map((s) => (
+                      <span key={s} className="rounded-md bg-electric/15 px-2 py-0.5 text-xs font-medium text-electric">
+                        {s}
+                      </span>
+                    ))}
+                  </span>
+                ) : null,
+                edit: 1,
+              },
+              { label: 'Experience', value: data.experience, edit: 1 },
+              {
+                label: 'Salary expectation',
+                value: data.salary ? `₹${Number(data.salary).toLocaleString('en-IN')} / month` : null,
+                edit: 1,
+              },
+              { label: 'Account & Password', value: '••••••••', edit: 2 },
+            ]}
+          />
+        )
+      },
     },
   ]
 

@@ -8,6 +8,7 @@ import PasswordInput from '../components/auth/PasswordInput'
 import StatusScreen from '../components/auth/StatusScreen'
 import { SelectBlock, TermsCheck } from '../components/auth/FormControls'
 import RegisterSteps from '../components/auth/RegisterSteps'
+import ReviewSummary from '../components/auth/ReviewSummary'
 import {
   validateName,
   validateEmail,
@@ -18,7 +19,7 @@ import {
 } from '../auth/validation'
 import { useAuth } from '../auth/AuthContext'
 import { sendEnrollmentConfirmation } from '../auth/EmailService'
-import { ENROLLMENT_STATUS_LABELS } from '../auth/AuthService'
+import { isEmailTaken, isPhoneTaken, ENROLLMENT_STATUS_LABELS } from '../auth/AuthService'
 import { EASE } from '../lib/animations'
 
 // Degree / course option lists — module-level so they can later be sourced from
@@ -46,7 +47,7 @@ const COURSE_OPTIONS = [
 ]
 
 export default function LearnerRegister() {
-  const { enrollLearner } = useAuth()
+  const { enrollLearner, user } = useAuth()
   const navigate = useNavigate()
 
   const [submitting, setSubmitting] = useState(false)
@@ -65,8 +66,16 @@ export default function LearnerRegister() {
       label: 'Personal',
       validate: (d) => ({
         name: validateName(d.name),
-        email: validateEmail(d.email),
-        phone: validatePhone(d.phone),
+        email:
+          validateEmail(d.email) ||
+          (isEmailTaken(d.email, user?.id)
+            ? 'This email is already registered. Please use a different email address.'
+            : ''),
+        phone:
+          validatePhone(d.phone) ||
+          (isPhoneTaken(d.phone, user?.id)
+            ? 'This mobile number is already registered. Please use a different mobile number.'
+            : ''),
       }),
       form: ({ data, set, errors }) => (
         <>
@@ -196,6 +205,29 @@ export default function LearnerRegister() {
         </>
       ),
     },
+    {
+      id: 'review',
+      label: 'Review',
+      validate: () => ({}),
+      form: ({ data, goTo }) => (
+        <ReviewSummary
+          accent="#8B5CF6"
+          goTo={goTo}
+          rows={[
+            { label: 'Full name', value: data.name, edit: 0 },
+            { label: 'Email', value: data.email, edit: 0 },
+            { label: 'Phone', value: data.phone, edit: 0 },
+            {
+              label: 'Department / Degree',
+              value: data.degree === 'Other' ? data.otherDegree : data.degree,
+              edit: 1,
+            },
+            { label: 'Needed course', value: data.course === 'Other' ? data.otherCourse : data.course, edit: 1 },
+            { label: 'Account & Password', value: '••••••••', edit: 2 },
+          ]}
+        />
+      ),
+    },
   ]
 
   // Success state — enrollment is saved; redirect happens automatically.
@@ -258,7 +290,7 @@ export default function LearnerRegister() {
     <RegisterSteps
       eyebrow="Learner Enrollment"
       title="Start Your Learning Journey"
-      sub="Tell us what you want to learn — it takes under a minute. Submit your details in three steps."
+      sub="Tell us what you want to learn — it takes under a minute. Submit your details in four quick steps."
       steps={steps}
       finalLabel="Submit Enrollment"
       onSubmit={onSubmit}

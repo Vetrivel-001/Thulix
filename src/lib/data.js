@@ -10,15 +10,15 @@ export const NAV_LINKS = [
 ]
 
 export const TRUST_COMPANIES = [
-  { name: 'Google', role: 'r', color: '#059669' },
-  { name: 'Microsoft', role: 'r', color: '#2563EB' },
-  { name: 'Amazon', role: 'r', color: '#7C3AED' },
-  { name: 'Infosys', role: 'r', color: '#10B981' },
-  { name: 'TCS', role: 'r', color: '#059669' },
-  { name: 'IBM', role: 'r', color: '#2563EB' },
-  { name: 'Oracle', role: 'r', color: '#7C3AED' },
-  { name: 'Adobe', role: 'r', color: '#10B981' },
-  { name: 'Accenture', role: 'r', color: '#059669' },
+  { name: 'Google', role: 'r', color: '#059669', href: 'https://www.google.com' },
+  { name: 'Microsoft', role: 'r', color: '#2563EB', href: 'https://www.microsoft.com' },
+  { name: 'Amazon', role: 'r', color: '#7C3AED', href: 'https://www.amazon.com' },
+  { name: 'Infosys', role: 'r', color: '#10B981', href: 'https://www.infosys.com' },
+  { name: 'TCS', role: 'r', color: '#059669', href: 'https://www.tcs.com' },
+  { name: 'IBM', role: 'r', color: '#2563EB', href: 'https://www.ibm.com' },
+  { name: 'Oracle', role: 'r', color: '#7C3AED', href: 'https://www.oracle.com' },
+  { name: 'Adobe', role: 'r', color: '#10B981', href: 'https://www.adobe.com' },
+  { name: 'Accenture', role: 'r', color: '#059669', href: 'https://www.accenture.com' },
 ]
 
 export const PROBLEMS = [

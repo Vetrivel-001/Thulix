@@ -8,6 +8,7 @@ import PasswordInput from '../components/auth/PasswordInput'
 import StatusScreen from '../components/auth/StatusScreen'
 import { TermsCheck } from '../components/auth/FormControls'
 import RegisterSteps from '../components/auth/RegisterSteps'
+import ReviewSummary from '../components/auth/ReviewSummary'
 import {
   validateName,
   validateEmail,
@@ -20,11 +21,11 @@ import {
 } from '../auth/validation'
 import { useAuth } from '../auth/AuthContext'
 import { sendRecruiterApplicationConfirmation } from '../auth/EmailService'
-import { RECRUITER_APPLICATION_STATUS_LABELS } from '../auth/AuthService'
+import { RECRUITER_APPLICATION_STATUS_LABELS, isEmailTaken, isPhoneTaken } from '../auth/AuthService'
 import { EASE } from '../lib/animations'
 
 export default function RecruiterRegister() {
-  const { enrollRecruiter } = useAuth()
+  const { enrollRecruiter, user } = useAuth()
   const navigate = useNavigate()
 
   const [submitting, setSubmitting] = useState(false)
@@ -43,8 +44,16 @@ export default function RecruiterRegister() {
       label: 'Personal',
       validate: (d) => ({
         name: validateName(d.name),
-        email: validateEmail(d.email),
-        phone: validatePhone(d.phone),
+        email:
+          validateEmail(d.email) ||
+          (isEmailTaken(d.email, user?.id)
+            ? 'This email is already registered. Please use a different email address.'
+            : ''),
+        phone:
+          validatePhone(d.phone) ||
+          (isPhoneTaken(d.phone, user?.id)
+            ? 'This mobile number is already registered. Please use a different mobile number.'
+            : ''),
         jobTitle: validateRequired(d.jobTitle, 'job title'),
       }),
       form: ({ data, set, errors }) => (
@@ -193,6 +202,28 @@ export default function RecruiterRegister() {
             </div>
           </div>
         </>
+      ),
+    },
+    {
+      id: 'review',
+      label: 'Review',
+      validate: () => ({}),
+      form: ({ data, goTo }) => (
+        <ReviewSummary
+          accent="#10B981"
+          goTo={goTo}
+          rows={[
+            { label: 'Full name', value: data.name, edit: 0 },
+            { label: 'Work email', value: data.email, edit: 0 },
+            { label: 'Phone', value: data.phone, edit: 0 },
+            { label: 'Job title', value: data.jobTitle, edit: 0 },
+            { label: 'Company name', value: data.companyName, edit: 1 },
+            { label: 'Company email / domain', value: data.companyEmail, edit: 1 },
+            { label: 'Website', value: data.website, edit: 1 },
+            { label: 'Company location', value: data.companyLocation, edit: 2 },
+            { label: 'Account & Password', value: '••••••••', edit: 3 },
+          ]}
+        />
       ),
     },
   ]

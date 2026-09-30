@@ -1,61 +1,43 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import {
-  Activity, AlertTriangle, ArrowRight, Bell, Check, Clock, GraduationCap, LayoutDashboard,
-  Mail, RefreshCw, Search, ShieldCheck, Trash2, Undo2, UserCheck, UserX, Users, X, Presentation, Briefcase,
-} from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, Bell, Check, RefreshCw, Search } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
-import {
-  isRejectedApplication,
-  ENROLLMENT_STATUS_LABELS,
-  TRAINER_APPLICATION_STATUS_LABELS,
-  RECRUITER_APPLICATION_STATUS_LABELS,
-} from '../auth/AuthService'
-import { ROLE_LABELS } from '../auth/permission'
+import { ENROLLMENT_STATUS_LABELS, TRAINER_APPLICATION_STATUS_LABELS, RECRUITER_APPLICATION_STATUS_LABELS } from '../auth/AuthService'
 import AccountMenu from '../components/auth/AccountMenu'
+import AdminSidebar, { MobileAdminNav } from '../components/admin/AdminSidebar'
+import AdminOverview from '../components/admin/AdminOverview'
+import ApprovalsPanel from '../components/admin/ApprovalsPanel'
+import EnquiriesPanel from '../components/admin/EnquiriesPanel'
+import TrainersPanel from '../components/admin/TrainersPanel'
+import RecruitersPanel from '../components/admin/RecruitersPanel'
+import UsersPanel from '../components/admin/UsersPanel'
 
-const TINT = '#F59E0B'
-const ROLE_TINTS = { learner: '#8B5CF6', trainer: '#06B6D4', recruiter: '#10B981', admin: '#F59E0B' }
-const ENROLLMENT_TINTS = { new: '#F59E0B', contacted: '#06B6D4', in_progress: '#8B5CF6', enrolled: '#10B981', closed: '#94A3B8' }
-const TRAINER_TINTS = { new: '#F59E0B', reviewed: '#06B6D4', accepted: '#10B981', not_accepted: '#EC4899', closed: '#94A3B8' }
-const RECRUITER_TINTS = { new: '#F59E0B', reviewed: '#06B6D4', accepted: '#10B981', not_accepted: '#EC4899', closed: '#94A3B8' }
-
-// ₹ amount from a stored numeric salary (never a formatted string).
-function formatSalary(value) {
-  const n = Number(value)
-  if (!n) return '—'
-  return `₹${n.toLocaleString('en-IN')}`
-}
-
-const STATUS_STYLE = {
-  active: { label: 'Active', color: '#10B981' },
-  pending: { label: 'Pending', color: '#F59E0B' },
-  rejected: { label: 'Rejected', color: '#EC4899' },
-}
-
-function Badge({ color, children }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-      style={{ background: `${color}1a`, color }}
-    >
-      {children}
-    </span>
-  )
-}
-
-function RoleBadge({ role }) {
-  const c = ROLE_TINTS[role] || '#94A3B8'
-  return <Badge color={c}>{ROLE_LABELS[role] || role}</Badge>
-}
-
-function StatusBadge({ status }) {
-  const s = STATUS_STYLE[status] || STATUS_STYLE.pending
-  return <Badge color={s.color}>{s.label}</Badge>
+const VIEW_META = {
+  overview: { title: 'Welcome back', sub: 'A quick pulse of every application and account on Thulix.' },
+  approvals: { title: 'Approvals', sub: 'Approve, reject or reactivate applications that need your attention.' },
+  enquiries: { title: 'Learner Enquiries', sub: 'Track course enquiries from intake through enrollment.' },
+  trainers: { title: 'Trainer Applications', sub: 'Review trainer profiles, skills and salary expectations.' },
+  recruiters: { title: 'Recruiter Applications', sub: 'Review hiring partners and their company details.' },
+  users: { title: 'All Users', sub: 'Search and manage every account on the platform.' },
 }
 
 export default function AdminDashboard() {
-  const { user, getAllUsers, getPendingApplications, getRejectedApplications, getStats, setUserStatus, deleteUser, getLearnerEnrollments, updateEnrollmentStatus, getTrainerApplications, updateTrainerApplicationStatus, getRecruiterApplications, updateRecruiterApplicationStatus } = useAuth()
+  const {
+    user,
+    getAllUsers,
+    getPendingApplications,
+    getRejectedApplications,
+    getStats,
+    setUserStatus,
+    deleteUser,
+    getLearnerEnrollments,
+    updateEnrollmentStatus,
+    getTrainerApplications,
+    updateTrainerApplicationStatus,
+    getRecruiterApplications,
+    updateRecruiterApplicationStatus,
+  } = useAuth()
+
+  const [view, setView] = useState('overview')
   const [users, setUsers] = useState([])
   const [apps, setApps] = useState([])
   const [rejectedApps, setRejectedApps] = useState([])
@@ -68,11 +50,6 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false)
   const [confirmingRemove, setConfirmingRemove] = useState(null)
   const [query, setQuery] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [enrFilter, setEnrFilter] = useState('all')
-  const [trnFilter, setTrnFilter] = useState('all')
-  const [rcrFilter, setRcrFilter] = useState('all')
 
   const reload = useCallback(() => {
     setUsers(getAllUsers())
@@ -93,18 +70,17 @@ export default function AdminDashboard() {
     return () => window.removeEventListener('storage', onStorage)
   }, [reload])
 
-  // Refresh handler with visible spinner + feedback.
+  const flash = (msg, ok = true) => {
+    setNotice({ msg, ok })
+    setTimeout(() => setNotice(null), 3500)
+  }
+
   const handleRefresh = () => {
     if (refreshing) return
     setRefreshing(true)
     reload()
     flash('Dashboard refreshed.')
     setTimeout(() => setRefreshing(false), 600)
-  }
-
-  const flash = (msg, ok = true) => {
-    setNotice({ msg, ok })
-    setTimeout(() => setNotice(null), 3500)
   }
 
   const act = async (id, status, okMsg) => {
@@ -119,6 +95,11 @@ export default function AdminDashboard() {
       setBusy((b) => ({ ...b, [id]: undefined }))
     }
   }
+
+  const approve = (u) => act(u.id, 'active', `${u.name} approved — they can now sign in.`)
+  const reject = (u) => act(u.id, 'rejected', `${u.name} rejected.`)
+  const reactivate = (u) => act(u.id, 'active', `${u.name} reactivated — they can now sign in.`)
+  const deactivate = (u) => act(u.id, 'rejected', `${u.name} deactivated.`)
 
   const changeEnrollmentStatus = async (id, status) => {
     const entry = enrollments.find((x) => x.id === id)
@@ -162,50 +143,19 @@ export default function AdminDashboard() {
     }
   }
 
-  const removeApp = async (id, name) => {
-    setBusy((b) => ({ ...b, [id]: 'removing' }))
+  const removeApp = async (u) => {
+    setBusy((b) => ({ ...b, [u.id]: 'removing' }))
     try {
-      await deleteUser(id)
+      await deleteUser(u.id)
       reload()
-      flash(`${name} removed.`)
+      flash(`${u.name} removed.`)
     } catch (e) {
       flash(e.message || 'Something went wrong.', false)
     } finally {
-      setBusy((b) => ({ ...b, [id]: undefined }))
+      setBusy((b) => ({ ...b, [u.id]: undefined }))
       setConfirmingRemove(null)
     }
   }
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return users.filter((u) => {
-      // Rejected applications (trainer/recruiter/learner) live in the Rejected section only.
-      if (isRejectedApplication(u)) return false
-      if (roleFilter !== 'all' && u.role !== roleFilter) return false
-      if (statusFilter !== 'all' && u.status !== statusFilter) return false
-      if (!q) return true
-      return (
-        (u.name || '').toLowerCase().includes(q) ||
-        (u.email || '').toLowerCase().includes(q) ||
-        (u.meta?.companyName || '').toLowerCase().includes(q)
-      )
-    })
-  }, [users, query, roleFilter, statusFilter])
-
-  const displayedEnrollments = useMemo(() => {
-    if (enrFilter === 'all') return enrollments
-    return enrollments.filter((e) => (e.enrollment?.enrollmentStatus || 'new') === enrFilter)
-  }, [enrollments, enrFilter])
-
-  const displayedTrainerApps = useMemo(() => {
-    if (trnFilter === 'all') return trainerApps
-    return trainerApps.filter((t) => (t.application?.applicationStatus || 'new') === trnFilter)
-  }, [trainerApps, trnFilter])
-
-  const displayedRecruiterApps = useMemo(() => {
-    if (rcrFilter === 'all') return recruiterApps
-    return recruiterApps.filter((r) => (r.application?.applicationStatus || 'new') === rcrFilter)
-  }, [recruiterApps, rcrFilter])
 
   if (!stats) {
     return (
@@ -215,718 +165,118 @@ export default function AdminDashboard() {
     )
   }
 
-  const statCards = [
-    { label: 'Total Users', value: stats.total, icon: Users, color: '#94A3B8' },
-    { label: 'Active', value: stats.active, icon: UserCheck, color: '#10B981' },
-    { label: 'Pending', value: stats.pending, icon: Clock, color: '#F59E0B' },
-    { label: 'Rejected', value: stats.rejectedApps, icon: UserX, color: '#EC4899' },
-  ]
+  const meta = VIEW_META[view] || VIEW_META.overview
 
   return (
-    <div className="min-h-screen bg-abyss">
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 border-b border-[rgba(148,163,184,0.1)] bg-abyss/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${TINT}1A`, color: TINT }}>
-              <LayoutDashboard size={18} />
-            </Link>
-            <div className="hidden sm:block">
-              <p className="text-sm font-bold text-snow">Admin Dashboard</p>
-              <p className="text-xs text-mist">Thulix · Platform Admin</p>
+    <div className="flex min-h-screen bg-abyss">
+      <AdminSidebar active={view} onNavigate={setView} />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Top bar */}
+        <header className="sticky top-0 z-20 border-b border-[rgba(148,163,184,0.1)] bg-abyss/80 backdrop-blur-xl">
+          <div className="flex items-center gap-2.5 px-4 py-3 sm:px-6">
+            <div className="flex max-w-md flex-1 items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/60 px-3 py-2">
+              <Search size={15} className="text-mist" aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search users, emails, companies..."
+                className="w-full bg-transparent text-sm text-snow placeholder:text-mist/50 outline-none"
+              />
             </div>
-          </div>
-          <div className="flex flex-1 items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/60 px-3 py-2 max-w-md">
-            <Search size={15} className="text-mist" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search users, emails, companies..."
-              className="w-full bg-transparent text-sm text-snow placeholder:text-mist/50 outline-none"
-            />
-          </div>
-          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={refreshing}
+              aria-label={refreshing ? 'Refreshing' : 'Refresh dashboard'}
+              className="ml-auto inline-flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.2)] px-3.5 py-2 text-sm font-semibold text-mist transition-colors hover:text-snow disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw size={15} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
+              <span className="hidden sm:inline">{refreshing ? 'Refreshing…' : 'Refresh'}</span>
+            </button>
             <span className="relative grid h-9 w-9 place-items-center rounded-xl text-mist transition-colors hover:text-snow" aria-label="Notifications">
               <Bell size={18} />
-              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full" style={{ background: TINT }} />
+              <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-golden" />
             </span>
             <AccountMenu align="right" />
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-3xl font-bold text-snow">
-              Admin Studio, <span style={{ color: TINT }}>{user?.name?.split(' ')[0] || 'Admin'}</span>
+        <main className="flex-1 px-4 py-6 sm:px-6 xl:px-10">
+          <MobileAdminNav active={view} onNavigate={setView} />
+
+          <div className="mb-6">
+            <h1 className="font-heading text-2xl font-bold text-snow sm:text-3xl">
+              {meta.title}
+              {view === 'overview' && (
+                <span className="text-golden">, {user?.name?.split(' ')[0] || 'Admin'}</span>
+              )}
             </h1>
-            <p className="mt-2 text-mist">Review applications and manage every account on Thulix.</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.2)] px-4 py-2 text-sm font-semibold text-mist transition-colors hover:text-snow disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw size={15} aria-hidden="true" className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-
-        {notice && (
-          <div
-            role="status"
-            className={`mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
-              notice.ok ? 'border-success/40 bg-success/10 text-snow' : 'border-error/40 bg-error/10 text-snow'
-            }`}
-          >
-            {notice.ok ? <Check size={16} className="text-success" /> : <AlertTriangle size={16} className="text-error" />}
-            {notice.msg}
-          </div>
-        )}
-
-        {/* Stats */}
-        <section aria-label="Statistics" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((c) => (
-            <div key={c.label} className="relative overflow-hidden rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-5">
-              <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full opacity-30 blur-2xl" style={{ background: `${c.color}44` }} />
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-mist">{c.label}</p>
-                <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: `${c.color}1a`, color: c.color }}>
-                  <c.icon size={17} />
-                </span>
-              </div>
-              <p className="mt-3 font-heading text-3xl font-bold text-snow">{c.value}</p>
-            </div>
-          ))}
-        </section>
-
-        {/* Per-role breakdown */}
-        <section aria-label="Users by role" className="mt-6 grid gap-4 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 sm:grid-cols-4">
-          {Object.entries(stats.byRole).map(([role, count]) => (
-            <div key={role} className="flex items-center gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${ROLE_TINTS[role]}1a`, color: ROLE_TINTS[role] }}>
-                <Activity size={17} />
-              </span>
-              <div>
-                <p className="text-lg font-bold text-snow">{count}</p>
-                <p className="text-xs uppercase tracking-wide text-mist">{ROLE_LABELS[role] || role}s</p>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {/* Pending applications */}
-        <section aria-label="Pending applications" className="mt-10">
-          <div className="mb-4 flex items-center gap-2.5">
-            <Clock size={18} className="text-golden" />
-            <h2 className="font-heading text-xl font-bold text-snow">Pending Approvals</h2>
-            <span className="rounded-full bg-golden/15 px-2.5 py-0.5 text-xs font-semibold text-golden">{apps.length}</span>
+            <p className="mt-2 text-sm text-mist">{meta.sub}</p>
           </div>
 
-          {apps.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
-              <ShieldCheck size={18} className="text-success" /> No pending applications — you're all caught up.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40">
-              <div className="divide-y divide-[rgba(148,163,184,0.08)]">
-                {apps.map((a) => (
-                  <div key={a.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-4">
-                      <span
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-base font-bold text-white"
-                        style={{ background: `${ROLE_TINTS[a.role]}33`, color: ROLE_TINTS[a.role] }}
-                      >
-                        {(a.name || 'U').slice(0, 1).toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-semibold text-snow">{a.name}</p>
-                          <RoleBadge role={a.role} />
-                        </div>
-                        <p className="flex items-center gap-1.5 truncate text-sm text-mist">
-                          <Mail size={12} className="shrink-0" aria-hidden="true" /> {a.email}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-mist/70">
-                          {a.role === 'trainer'
-                            ? [a.meta?.professionalTitle, a.meta?.expertise, a.meta?.experience].filter(Boolean).join(' · ')
-                            : [a.meta?.companyName, a.meta?.companyLocation].filter(Boolean).join(' · ')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={!!busy[a.id]}
-                        onClick={() => act(a.id, 'active', `${a.name} approved — they can now sign in.`)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[linear-gradient(120deg,#06B6D4,#8B5CF6)] px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 disabled:opacity-50"
-                      >
-                        <Check size={15} aria-hidden="true" /> {busy[a.id] === 'active' ? 'Saving…' : 'Approve'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!!busy[a.id]}
-                        onClick={() => act(a.id, 'rejected', `${a.name} rejected.`)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(236,72,153,0.3)] bg-[rgba(236,72,153,0.08)] px-4 py-2 text-sm font-semibold text-blush transition-colors hover:bg-[rgba(236,72,153,0.15)] disabled:opacity-50"
-                      >
-                        <X size={15} aria-hidden="true" /> {busy[a.id] === 'rejected' ? 'Saving…' : 'Reject'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {notice && (
+            <div
+              role="status"
+              className={`mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+                notice.ok ? 'border-success/40 bg-success/10 text-snow' : 'border-error/40 bg-error/10 text-snow'
+              }`}
+            >
+              {notice.ok ? <Check size={16} className="text-success" /> : <AlertTriangle size={16} className="text-error" />}
+              {notice.msg}
             </div>
           )}
-        </section>
 
-        {/* Rejected applications */}
-        <section aria-label="Rejected applications" className="mt-10">
-          <div className="mb-4 flex items-center gap-2.5">
-            <UserX size={18} className="text-blush" />
-            <h2 className="font-heading text-xl font-bold text-snow">Rejected Applications</h2>
-            <span className="rounded-full bg-blush/15 px-2.5 py-0.5 text-xs font-semibold text-blush">{rejectedApps.length}</span>
-          </div>
-
-          {rejectedApps.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
-              <ShieldCheck size={18} className="text-success" /> No rejected applications.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-[rgba(236,72,153,0.2)] bg-abyss-2/40">
-              <div className="divide-y divide-[rgba(148,163,184,0.08)]">
-                {rejectedApps.map((a) => (
-                  <div key={a.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-4">
-                      <span
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-base font-bold text-white"
-                        style={{ background: `${ROLE_TINTS[a.role]}33`, color: ROLE_TINTS[a.role] }}
-                      >
-                        {(a.name || 'U').slice(0, 1).toUpperCase()}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate font-semibold text-snow">{a.name}</p>
-                          <RoleBadge role={a.role} />
-                          <StatusBadge status={a.status} />
-                        </div>
-                        <p className="flex items-center gap-1.5 truncate text-sm text-mist">
-                          <Mail size={12} className="shrink-0" aria-hidden="true" /> {a.email}
-                        </p>
-                        <p className="mt-0.5 truncate text-xs text-mist/70">
-                          {a.role === 'trainer'
-                            ? [a.meta?.professionalTitle, a.meta?.expertise, a.meta?.experience].filter(Boolean).join(' · ')
-                            : a.role === 'learner'
-                              ? [a.meta?.degree, a.meta?.department, a.meta?.educationStatus, a.meta?.city].filter(Boolean).join(' · ')
-                              : [a.meta?.companyName, a.meta?.companyLocation].filter(Boolean).join(' · ')}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        disabled={!!busy[a.id]}
-                        onClick={() => act(a.id, 'active', `${a.name} reactivated — they can now sign in.`)}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-4 py-2 text-sm font-semibold text-success transition-colors hover:bg-[rgba(16,185,129,0.15)] disabled:opacity-50"
-                      >
-                        <Undo2 size={15} aria-hidden="true" /> {busy[a.id] === 'active' ? 'Saving…' : 'Reactivate'}
-                      </button>
-                      {confirmingRemove === a.id ? (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            disabled={!!busy[a.id]}
-                            onClick={() => removeApp(a.id, a.name)}
-                            className="inline-flex items-center gap-1 rounded-xl bg-[rgba(236,72,153,0.9)] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[rgba(236,72,153,1)] disabled:opacity-50"
-                          >
-                            <Trash2 size={14} aria-hidden="true" /> {busy[a.id] === 'removing' ? 'Removing…' : 'Confirm'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!!busy[a.id]}
-                            onClick={() => setConfirmingRemove(null)}
-                            className="inline-flex items-center rounded-xl border border-[rgba(148,163,184,0.2)] px-3 py-2 text-sm text-mist transition-colors hover:text-snow"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={!!busy[a.id]}
-                          onClick={() => setConfirmingRemove(a.id)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(236,72,153,0.3)] bg-[rgba(236,72,153,0.08)] px-4 py-2 text-sm font-semibold text-blush transition-colors hover:bg-[rgba(236,72,153,0.15)] disabled:opacity-50"
-                        >
-                          <Trash2 size={15} aria-hidden="true" /> Remove
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {view === 'overview' && (
+            <AdminOverview
+              stats={stats}
+              enrollments={enrollments}
+              trainerApps={trainerApps}
+              recruiterApps={recruiterApps}
+              onNavigate={setView}
+            />
           )}
-        </section>
 
-        {/* Learner enquiries */}
-        <section aria-label="Learner enquiries" className="mt-10">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <GraduationCap size={18} className="text-neon" />
-              <h2 className="font-heading text-xl font-bold text-snow">Learner Enquiries</h2>
-              <span className="rounded-full bg-neon/15 px-2.5 py-0.5 text-xs font-semibold text-neon">{displayedEnrollments.length}</span>
-            </div>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <select
-                value={enrFilter}
-                onChange={(e) => setEnrFilter(e.target.value)}
-                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-neon/50"
-                aria-label="Filter enquiries by status"
-              >
-                <option value="all">All statuses</option>
-                {Object.entries(ENROLLMENT_STATUS_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {enrollments.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
-              <ShieldCheck size={18} className="text-success" /> No learner enquiries yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-[rgba(139,92,246,0.22)] bg-abyss-2/40">
-              <table className="w-full min-w-[880px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
-                    <th className="px-5 py-3 font-semibold">Enquiry ID</th>
-                    <th className="px-5 py-3 font-semibold">Learner</th>
-                    <th className="px-5 py-3 font-semibold">Phone</th>
-                    <th className="px-5 py-3 font-semibold">Department / Degree</th>
-                    <th className="px-5 py-3 font-semibold">Needed Course</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
-                  {displayedEnrollments.map((e) => {
-                    const current = e.enrollment?.enrollmentStatus || 'new'
-                    return (
-                      <tr key={e.id} className="align-middle">
-                        <td className="px-5 py-3.5">
-                          <span className="rounded-lg bg-neon/10 px-2 py-1 font-mono text-xs font-semibold text-neon">
-                            {e.enrollment?.enquiryId || '—'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white"
-                              style={{ background: `${ROLE_TINTS.learner}33`, color: ROLE_TINTS.learner }}
-                            >
-                              {(e.name || 'U').slice(0, 1).toUpperCase()}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-snow">{e.name}</p>
-                              <p className="truncate text-xs text-mist">{e.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{e.enrollment?.phone || '—'}</td>
-                        <td className="max-w-[180px] truncate px-5 py-3.5 text-mist">{e.enrollment?.departmentOrDegree || '—'}</td>
-                        <td className="max-w-[180px] truncate px-5 py-3.5 text-snow">{e.enrollment?.neededCourse || '—'}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex flex-col items-start gap-1.5">
-                            <span
-                              className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{
-                                background: `${ENROLLMENT_TINTS[current] || '#F59E0B'}1a`,
-                                color: ENROLLMENT_TINTS[current] || '#F59E0B',
-                              }}
-                            >
-                              {ENROLLMENT_STATUS_LABELS[current] || current}
-                            </span>
-                            <select
-                              value={current}
-                              disabled={!!busy[`enr_${e.id}`]}
-                              onChange={(ev) => changeEnrollmentStatus(e.id, ev.target.value)}
-                              aria-label={`Enrollment status for ${e.name}`}
-                              className="rounded-lg border border-[rgba(148,163,184,0.18)] bg-abyss-2/70 px-2 py-1 text-xs text-snow outline-none transition-colors focus:border-neon/60 disabled:opacity-50"
-                            >
-                              {Object.entries(ENROLLMENT_STATUS_LABELS).map(([key, label]) => (
-                                <option key={key} value={key}>{label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">
-                          {e.createdAt ? new Date(e.createdAt).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {displayedEnrollments.length === 0 && (
-                <div className="flex items-center gap-3 p-6 text-sm text-mist">
-                  <AlertTriangle size={18} className="text-golden" /> No enquiries match this status.
-                </div>
-              )}
-            </div>
+          {view === 'approvals' && (
+            <ApprovalsPanel
+              apps={apps}
+              rejectedApps={rejectedApps}
+              busy={busy}
+              confirmingRemove={confirmingRemove}
+              onApprove={approve}
+              onReject={reject}
+              onReactivate={reactivate}
+              onRequestRemove={setConfirmingRemove}
+              onCancelRemove={() => setConfirmingRemove(null)}
+              onConfirmRemove={removeApp}
+            />
           )}
-        </section>
 
-        {/* Trainer applications */}
-        <section aria-label="Trainer applications" className="mt-10">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <Presentation size={18} className="text-electric" />
-              <h2 className="font-heading text-xl font-bold text-snow">Trainer Applications</h2>
-              <span className="rounded-full bg-electric/15 px-2.5 py-0.5 text-xs font-semibold text-electric">{displayedTrainerApps.length}</span>
-            </div>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <select
-                value={trnFilter}
-                onChange={(e) => setTrnFilter(e.target.value)}
-                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-electric/50"
-                aria-label="Filter trainer applications by status"
-              >
-                <option value="all">All statuses</option>
-                {Object.entries(TRAINER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {trainerApps.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
-              <ShieldCheck size={18} className="text-success" /> No trainer applications yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-[rgba(6,182,212,0.24)] bg-abyss-2/40">
-              <table className="w-full min-w-[1040px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
-                    <th className="px-5 py-3 font-semibold">Application ID</th>
-                    <th className="px-5 py-3 font-semibold">Trainer</th>
-                    <th className="px-5 py-3 font-semibold">Phone</th>
-                    <th className="px-5 py-3 font-semibold">Course Offered</th>
-                    <th className="px-5 py-3 font-semibold">Known Skills</th>
-                    <th className="px-5 py-3 font-semibold">Experience</th>
-                    <th className="px-5 py-3 font-semibold">Salary Exp.</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
-                  {displayedTrainerApps.map((t) => {
-                    const current = t.application?.applicationStatus || 'new'
-                    return (
-                      <tr key={t.id} className="align-middle">
-                        <td className="px-5 py-3.5">
-                          <span className="rounded-lg bg-electric/10 px-2 py-1 font-mono text-xs font-semibold text-electric">
-                            {t.application?.applicationId || '—'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white"
-                              style={{ background: `${ROLE_TINTS.trainer}33`, color: ROLE_TINTS.trainer }}
-                            >
-                              {(t.name || 'U').slice(0, 1).toUpperCase()}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-snow">{t.name}</p>
-                              <p className="truncate text-xs text-mist">{t.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{t.application?.phone || '—'}</td>
-                        <td className="max-w-[180px] truncate px-5 py-3.5 text-snow">{t.application?.courseOffered || '—'}</td>
-                        <td className="max-w-[200px] truncate px-5 py-3.5 text-mist">{(t.application?.knownSkills || []).join(', ') || '—'}</td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{t.application?.experience || '—'}</td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{formatSalary(t.application?.salaryExpectation)}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex flex-col items-start gap-1.5">
-                            <span
-                              className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{
-                                background: `${TRAINER_TINTS[current] || '#F59E0B'}1a`,
-                                color: TRAINER_TINTS[current] || '#F59E0B',
-                              }}
-                            >
-                              {TRAINER_APPLICATION_STATUS_LABELS[current] || current}
-                            </span>
-                            <select
-                              value={current}
-                              disabled={!!busy[`trn_${t.id}`]}
-                              onChange={(ev) => changeTrainerStatus(t.id, ev.target.value)}
-                              aria-label={`Application status for ${t.name}`}
-                              className="rounded-lg border border-[rgba(148,163,184,0.18)] bg-abyss-2/70 px-2 py-1 text-xs text-snow outline-none transition-colors focus:border-electric/60 disabled:opacity-50"
-                            >
-                              {Object.entries(TRAINER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
-                                <option key={key} value={key}>{label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">
-                          {t.createdAt ? new Date(t.createdAt).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {displayedTrainerApps.length === 0 && (
-                <div className="flex items-center gap-3 p-6 text-sm text-mist">
-                  <AlertTriangle size={18} className="text-golden" /> No applications match this status.
-                </div>
-              )}
-            </div>
+          {view === 'enquiries' && (
+            <EnquiriesPanel enrollments={enrollments} busy={busy} onChangeStatus={changeEnrollmentStatus} />
           )}
-        </section>
 
-        {/* Recruiter applications */}
-        <section aria-label="Recruiter applications" className="mt-10">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <Briefcase size={18} className="text-mint" />
-              <h2 className="font-heading text-xl font-bold text-snow">Recruiter Applications</h2>
-              <span className="rounded-full bg-mint/15 px-2.5 py-0.5 text-xs font-semibold text-mint">{displayedRecruiterApps.length}</span>
-            </div>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <select
-                value={rcrFilter}
-                onChange={(e) => setRcrFilter(e.target.value)}
-                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-mint/50"
-                aria-label="Filter recruiter applications by status"
-              >
-                <option value="all">All statuses</option>
-                {Object.entries(RECRUITER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>{label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {recruiterApps.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40 p-6 text-sm text-mist">
-              <ShieldCheck size={18} className="text-success" /> No recruiter applications yet.
-            </div>
-          ) : (
-            <div className="overflow-x-auto rounded-2xl border border-[rgba(16,185,129,0.24)] bg-abyss-2/40">
-              <table className="w-full min-w-[1180px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
-                    <th className="px-5 py-3 font-semibold">Application ID</th>
-                    <th className="px-5 py-3 font-semibold">Recruiter</th>
-                    <th className="px-5 py-3 font-semibold">Phone</th>
-                    <th className="px-5 py-3 font-semibold">Job Title</th>
-                    <th className="px-5 py-3 font-semibold">Company Name</th>
-                    <th className="px-5 py-3 font-semibold">Company Email / Domain</th>
-                    <th className="px-5 py-3 font-semibold">Website</th>
-                    <th className="px-5 py-3 font-semibold">Location</th>
-                    <th className="px-5 py-3 font-semibold">Status</th>
-                    <th className="px-5 py-3 font-semibold">Submitted</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
-                  {displayedRecruiterApps.map((r) => {
-                    const current = r.application?.applicationStatus || 'new'
-                    return (
-                      <tr key={r.id} className="align-middle">
-                        <td className="px-5 py-3.5">
-                          <span className="rounded-lg bg-mint/10 px-2 py-1 font-mono text-xs font-semibold text-mint">
-                            {r.application?.applicationId || '—'}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <span
-                              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white"
-                              style={{ background: `${ROLE_TINTS.recruiter}33`, color: ROLE_TINTS.recruiter }}
-                            >
-                              {(r.name || 'U').slice(0, 1).toUpperCase()}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-snow">{r.name}</p>
-                              <p className="truncate text-xs text-mist">{r.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">{r.application?.phone || '—'}</td>
-                        <td className="max-w-[160px] truncate px-5 py-3.5 text-snow">{r.application?.jobTitle || '—'}</td>
-                        <td className="max-w-[180px] truncate px-5 py-3.5 text-snow">{r.application?.companyName || '—'}</td>
-                        <td className="max-w-[180px] truncate px-5 py-3.5 text-mist">{r.application?.companyEmail || '—'}</td>
-                        <td className="max-w-[180px] truncate px-5 py-3.5 text-mist">{r.application?.website || '—'}</td>
-                        <td className="max-w-[160px] truncate px-5 py-3.5 text-mist">{r.application?.companyLocation || '—'}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex flex-col items-start gap-1.5">
-                            <span
-                              className="inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{
-                                background: `${RECRUITER_TINTS[current] || '#F59E0B'}1a`,
-                                color: RECRUITER_TINTS[current] || '#F59E0B',
-                              }}
-                            >
-                              {RECRUITER_APPLICATION_STATUS_LABELS[current] || current}
-                            </span>
-                            <select
-                              value={current}
-                              disabled={!!busy[`rcr_${r.id}`]}
-                              onChange={(ev) => changeRecruiterStatus(r.id, ev.target.value)}
-                              aria-label={`Application status for ${r.name}`}
-                              className="rounded-lg border border-[rgba(148,163,184,0.18)] bg-abyss-2/70 px-2 py-1 text-xs text-snow outline-none transition-colors focus:border-mint/60 disabled:opacity-50"
-                            >
-                              {Object.entries(RECRUITER_APPLICATION_STATUS_LABELS).map(([key, label]) => (
-                                <option key={key} value={key}>{label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-3.5 text-mist">
-                          {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-              {displayedRecruiterApps.length === 0 && (
-                <div className="flex items-center gap-3 p-6 text-sm text-mist">
-                  <AlertTriangle size={18} className="text-golden" /> No applications match this status.
-                </div>
-              )}
-            </div>
+          {view === 'trainers' && (
+            <TrainersPanel trainerApps={trainerApps} busy={busy} onChangeStatus={changeTrainerStatus} />
           )}
-        </section>
 
-        {/* All users */}
-        <section aria-label="All users" className="mt-10">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2.5">
-              <Users size={18} className="text-electric" />
-              <h2 className="font-heading text-xl font-bold text-snow">All Users</h2>
-              <span className="rounded-full bg-electric/15 px-2.5 py-0.5 text-xs font-semibold text-electric">{filtered.length}</span>
-            </div>
-            <div className="ml-auto flex flex-wrap gap-2">
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-electric/50"
-              >
-                <option value="all">All roles</option>
-                {Object.keys(ROLE_LABELS).map((r) => (
-                  <option key={r} value={r}>{ROLE_LABELS[r]}</option>
-                ))}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-xl border border-[rgba(148,163,184,0.15)] bg-abyss-2/70 px-3 py-2 text-sm text-snow outline-none focus:border-electric/50"
-              >
-                <option value="all">All statuses</option>
-                <option value="active">Active</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-          </div>
+          {view === 'recruiters' && (
+            <RecruitersPanel recruiterApps={recruiterApps} busy={busy} onChangeStatus={changeRecruiterStatus} />
+          )}
 
-          <div className="overflow-x-auto rounded-2xl border border-[rgba(148,163,184,0.12)] bg-abyss-2/40">
-            <table className="w-full min-w-[560px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-[rgba(148,163,184,0.1)] text-xs uppercase tracking-wider text-mist">
-                  <th className="px-5 py-3 font-semibold">User</th>
-                  <th className="px-5 py-3 font-semibold">Role</th>
-                  <th className="px-5 py-3 font-semibold">Status</th>
-                  <th className="px-5 py-3 font-semibold">Joined</th>
-                  <th className="px-5 py-3 text-right font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[rgba(148,163,184,0.08)]">
-                {filtered.map((u) => {
-                  const isSelf = u.id === user?.id
-                  const pendingReview = (u.role === 'trainer' || u.role === 'recruiter') && u.status === 'pending'
-                  return (
-                    <tr key={u.id}>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-xs font-bold text-white" style={{ background: `${ROLE_TINTS[u.role]}33`, color: ROLE_TINTS[u.role] }}>
-                            {(u.name || 'U').slice(0, 1).toUpperCase()}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-snow">{u.name}{isSelf && <span className="ml-1.5 text-xs text-golden">(you)</span>}</p>
-                            <p className="truncate text-xs text-mist">{u.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5"><RoleBadge role={u.role} /></td>
-                      <td className="px-5 py-3.5"><StatusBadge status={u.status} /></td>
-                      <td className="px-5 py-3.5 text-mist">
-                        {u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center justify-end gap-2">
-                          {pendingReview && (
-                            <button
-                              type="button"
-                              disabled={!!busy[u.id]}
-                              onClick={() => act(u.id, 'active', `${u.name} approved.`)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-[linear-gradient(120deg,#06B6D4,#8B5CF6)] px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
-                            >
-                              <Check size={13} /> Approve
-                            </button>
-                          )}
-                          {u.status === 'active' && u.role !== 'admin' && (
-                            <button
-                              type="button"
-                              disabled={!!busy[u.id]}
-                              onClick={() => act(u.id, 'rejected', `${u.name} deactivated.`)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-[rgba(236,72,153,0.25)] px-3 py-1.5 text-xs font-semibold text-blush disabled:opacity-50"
-                            >
-                              <X size={13} /> Deactivate
-                            </button>
-                          )}
-                          {(u.status === 'rejected' || (u.status === 'pending' && u.role === 'learner')) && (
-                            <button
-                              type="button"
-                              disabled={!!busy[u.id]}
-                              onClick={() => act(u.id, 'active', `${u.name} reactivated.`)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.08)] px-3 py-1.5 text-xs font-semibold text-success disabled:opacity-50"
-                            >
-                              <UserCheck size={13} /> Activate
-                            </button>
-                          )}
-                          {!pendingReview && u.status === 'active' && u.role !== 'admin' && (
-                            <span className="text-xs text-mist/50">—</span>
-                          )}
-                          {isSelf && <span className="text-xs text-mist/50">—</span>}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            {filtered.length === 0 && (
-              <div className="flex items-center gap-3 p-6 text-sm text-mist">
-                <AlertTriangle size={18} className="text-golden" /> No users match your filters.
-              </div>
-            )}
-          </div>
-        </section>
-
-        <div className="mt-10 flex justify-end">
-          <Link to="/" className="inline-flex items-center gap-2 rounded-xl border border-[rgba(148,163,184,0.2)] px-5 py-3 text-sm font-semibold text-mist transition-colors hover:text-snow">
-            Back to Home <ArrowRight size={15} />
-          </Link>
-        </div>
-      </main>
+          {view === 'users' && (
+            <UsersPanel
+              users={users}
+              query={query}
+              busy={busy}
+              selfId={user?.id}
+              onApprove={approve}
+              onReactivate={reactivate}
+              onDeactivate={deactivate}
+            />
+          )}
+        </main>
+      </div>
     </div>
   )
 }
